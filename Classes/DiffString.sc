@@ -3,7 +3,7 @@ DiffString {
 	var insertFunc, removeFunc, swapFunc, keepFunc;
 	var beginFunc, returnFunc, testFunc = true;
 	var <>verbose = false;
-	classvar tempFilePath = "";
+	classvar <>tempFilePath = "~/Desktop/";
 	// state:
 	var <prevTokens, <>tokenizer;
 
@@ -165,7 +165,8 @@ DiffString {
 	}
 
 	prWriteTempFile { |tokens|
-		var path = tempFilePath ++ "sc_diff_temp_" ++ UniqueID.next;
+		var path = tempFilePath +/+ "sc_diff_temp_" ++ UniqueID.next;
+		path = path.standardizePath;
 		try {
 			File.use(path, "wb", { |file|
 				if(tokens.size == 0) {
