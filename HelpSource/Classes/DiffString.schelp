@@ -1,0 +1,153 @@
+TITLE:: DiffString
+summary:: A parser for differences in strings
+categories::Little_Languages
+
+
+DESCRIPTION::
+A wrapper for the unix code::diff:: command line program.
+
+note::
+Sometimes, the commandline program fails for unknown reasons. DiffString throws an error before it calls any function then.
+::
+
+CLASSMETHODS::
+
+
+
+METHOD::new
+
+
+ARGUMENT::insertFunc
+Specify what to do when a new element is inserted in the result. As arguments are passed: newToken, index, oldToken.
+CODE::
+d = DiffString(insertFunc: { |new| "Please say hello to: %\n".postf(new) });
+d.value("abc");
+d.value("bcd");
+::
+
+ARGUMENT::removeFunc
+Specify what to do when an element is removed. As arguments are passed: oldToken, index.
+
+CODE::
+d = DiffString(removeFunc: { |new| "Please say good bye to: %\n".postf(new) });
+d.value("abc");
+d.value("bcd");
+::
+
+ARGUMENT::swapFunc
+Specify what to do when an element is replaced by a new one.  As arguments are passed: newToken, index, oldToken.
+
+CODE::
+d = DiffString(swapFunc: { |new, i, old| "Hello, I used to be %, but now I am %.\n".postf(old, new) });
+d.value("abc");
+d.value("apc");
+::
+
+ARGUMENT::keepFunc
+Specify what to do when an element is kept as it was.  As arguments are passed: oldToken, index.
+CODE::
+d = DiffString(keepFunc: { |old, i| "% says: 'I am still here, at index %'\n".postf(old, i); });
+d.value("abc");
+d.value("xxxabc");
+::
+
+ARGUMENT::beginFunc
+Specify what to do before the string is compared.  As arguments are passed: oldToken, index.
+CODE::
+(
+var new;
+d = DiffString(beginFunc: { new = List.new }, insertFunc: { |x| new.add(x) }, returnFunc: { new });
+)
+d.("abc");
+d.("abcxyz");
+::
+
+ARGUMENT::returnFunc
+Specify what to return from code::diff.value:: As arguments are passed the result of the functions for each line as an array.
+
+ARGUMENT::testFunc
+A global test functions that is called before calling any of the above (apart from beginFunc and returnFunc). As arguments are passed: index, operator, oldToken, newToken.
+
+
+INSTANCEMETHODS::
+
+PRIVATE::calcDiff
+
+METHOD:: parse
+Compare two arrays of tokens. A token can be a link::Classes/String:: or anything that can be converted to a string consistently (e.g. link::Classes/Char::, link::Classes/Symbol::, link::Classes/Integer::, but also an link::Classes/Array:: of these).
+
+ARGUMENT:: newTokens, oldTokens
+
+CODE::
+d = DiffString(swapFunc:{ |new, i, old| "% -> %\n".postf(old, new); new });
+d.parse([1, 1, 2, 3], [1, 1, 12, 3]);
+d.parse("hello world".split($ ), "hello word".split($ ));
+d.parse(["hello", "world"], ["hello", "word"]);
+d.parse([1, 1, [1, 2, 3], 3], [1, 1, [1, 2, 4], 3]); // subtokens are matched as a whole
+d.parse([[\freq, 351, \dur, 0.1], [\freq, 800, \dur, 0.1]], [[\freq, 440, \dur, 0.1], [\freq, 800, \dur, 0.1]]);
+::
+
+
+
+
+EXAMPLES::
+
+
+CODE::
+
+
+(
+var index = 0;
+var prevChar = "...";
+
+~list= Array.new;
+
+d = DiffString(
+	insertFunc: { |char, i|
+		("adding % after %:\n").postf(char, prevChar);
+		prevChar = char;
+		~list= ~list.insert(index, char);
+		index = index + 1;
+	},
+	removeFunc: { |char, i|
+		("removing" + char).postln;
+		~list.removeAt(index);
+	},
+	swapFunc: { |char, i, oldChar|
+		("swapping % with %:\n").postf(oldChar, char);
+		prevChar = char;
+		~list.put(index, char);
+		index = index + 1;
+	},
+	keepFunc: { |char, i|
+		("keeping" + char).postln;
+		prevChar = char;
+		index = index + 1;
+	},
+	beginFunc:{ index = 0 },
+	returnFunc: { ~list }
+);
+);
+
+d.value("hello word");
+d.value("hello world");
+d.value("hello");
+
+// or make a separate routine:
+(
+r = Routine { |inval|
+	var prev, outval;
+	loop {
+		inval = inval.as(Array);
+		outval = d.parse(inval, prev);
+		prev = inval;
+		inval = outval.yield
+	}
+};
+);
+
+r.next("hello");
+r.next("hello world");
+r.next("hello word");
+
+::

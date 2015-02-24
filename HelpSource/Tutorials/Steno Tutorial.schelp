@@ -1,0 +1,49 @@
+TITLE:: Steno Tutorial
+summary:: How to use Steno, a little language for spinning long strings of synths
+categories::Little Languages, Live Coding
+
+related::Steno
+
+
+code::
+// starting up: we "push" steno, so we can directly use steno code.
+t = Steno.push; s.boot;
+
+// a Steno program is as short as a single word, steno code is preceded by "--" on a beginning of a line
+--abc // this program plays a, b, c in series.
+
+// but we don't know what a, b, c are. Let's define them one by one and hear how "abc" sounds different:
+
+ // randomly varying impulses
+t.quelle(\a, { Impulse.ar(LFNoise1.kr(0.1).range(1, 4)) });
+
+ // a resonant low pass filter with cursor control and a random offset
+t.filter(\b, { |input| RLPF.ar(input, MouseX.kr(200, 10000, 1) + Rand(0, 300), 0.03) });
+
+// a modulated delay line
+t.filter(\c, { |input| DelayC.ar(input, 0.2, SinOsc.ar(Rand(2, 8)).range(0, 0.2)) + input })
+
+// now change the steno program
+--acb
+--accccc
+--accbcc
+
+// square brackets represent parallel processes
+--a[(ab)(ab)(ab)]c
+
+// some of the parameters in the synths are random. To restart the synths, just call .value without arguments:
+t.value;
+
+// change a single definition
+t.quelle(\a, { Impulse.ar(LFNoise2.kr(0.1).exprange(3, 1114)) });
+t.filter(\b, { |input| RLPF.ar(input, SinOsc.ar(Rand(0.2, 1)).exprange(200, Rand(5000, 8000)), 0.03) });
+
+// you can plot the synths on the server and see that each synth is represented by a letter
+s.plotTree;
+
+
+// to finish and free all ressources, call clear (and pop, to remove any preprocessor):
+t.clear.pop;
+
+
+::

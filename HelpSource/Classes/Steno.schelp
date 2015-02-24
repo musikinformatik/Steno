@@ -1,0 +1,432 @@
+TITLE:: Steno
+summary:: A little language for spinning long strings of synths
+categories::Little Languages, Live Coding
+
+related::Tutorials/Steno Tutorial
+
+DESCRIPTION::
+
+Steno, a little concatenative livecoding language embedded in SuperCollider, makes code for combining synth graphs very short, so that writing endless chains is like writing a single long word. A word is a program. A letter is a synth.footnote::This little language was developed together with the students of the music informatics seminar 2013 at the link::http://musikundmedien.net/##IMM::, in particular Armin Badde, Raffael Seyfried and Florian Zeeh. Special thanks also to Hans W. Koch, who moderated the seminar together with me.::
+
+
+Programs look like this: code::--ab[(ab)(ab)(ab)]c::
+
+IMAGE::graph02.svg::
+
+
+Semantics:
+
+list::
+
+## For live coding it follows a strong::dual language approach::: You can rewrite both the steno program and its sclang interpretation at runtime. So the meaning of each letter, the synth def, can be changed and the corresponding program changes accordingly.
+
+## Programs are composed of concurrently running processes. In other words, the emphasis::whole:: program has no explicit temporal semantics, instead emphasis::each:: component (letter) stands for its own temporal unfolding.
+
+## Only the part of the program that corresponds to code that was rewritten is changed. Thus, elements are kept, replaced, removed or inserted accoding to the difference between the old and the new program.
+::
+
+
+Steno has a minimal syntax:
+list::
+## one letter is one synth: code::abc::
+## square brackets: nested structure is parallel: code::[ab]c::
+## round parentheses: nested structure is serial: code::[(ab)(ab)]::
+## force a full replacement on eval: code::!abc::
+## line ending comments are ignored: code::abc // this is a comment::
+## variable names are optional and can be declared explicitly, see: link::#-declareVariables::
+::
+
+
+To avoid live coding troubles, some optional simplifications are given (by the link::#-preProcessor::):
+list::
+## words surrounded by spaces and lines are interpreted as parallel to each other: code::ab ab::
+## spaces are interpreted parallel or sequential, dependent on the context: code::[ab ab]:: -> code::[(ab)(ab)]::, and code::(ab ab):: -> code::([ab][ab])::.
+## non-matching brackets will be fixed as far as possible: code::"(ab (ab":: will become code::(ab (ab))::
+::
+
+
+code::
+t = Steno.new;
+s.boot;
+
+// define a few letters
+t.quelle(\a, { SinOsc.ar(Rand(200, 2130)) }); // quelle (aka source) produces sound
+t.filter(\f, { |input| LFPulse.kr(ExpRand(1, 10), 0, Rand(0.1, 0.5)) * input }); // filter processes sound
+t.filter(\g, { |input| CombL.ar(input, 0.2, Rand(0.03, 0.2), 1.3) });
+
+// use them in code:
+t.("af");
+t.("afg");
+t.("aafgafg");
+
+// selectively redefine the interpretation
+t.quelle(\a, { Blip.ar(ExpRand(1, 130), Rand(3, 100)) });
+t.filter(\g, { |input| RLPF.ar(CombL.ar(distort(input * 3), 0.1, Rand(0.01, 0.2), 0.3), LFDNoise1.kr(0.5).exprange(200, 10000), 0.2) });
+
+// parentheses structure the signal flow
+t.("[(af)(ag)(af)]f");
+t.cmdLine
+t.value; // resend everything
+s.plotTree; // show nodes
+::
+
+note::
+	Steno doesn't work on windows, because it relies on the unix diff command
+
+	If the diff program used by Steno fails to write a temporary file, you may have to change code::DiffString.tempFilePath = ...::
+	::
+
+note::
+This system is experimental, and you may encounter irregular problems.
+::
+
+
+CLASSMETHODS::
+method::new, push
+Return a new instance, ready to be specified. If push is used, it is immediately pushed (see link::#-push::).
+argument::numChannels
+The number of channels of the interconnecting link::Classes/Bus##busses:: (this is the same across the whole synth tree).
+argument::expand
+If set to true, the synth functions are multichannel expanded to numChannels.
+argument::maxBracketDepth
+The maximum depth of nested brackets. This determines the number of busses that need to be allocated.
+argument::server
+Server to play on.
+
+method::current
+The current Steno instance (like e.g. link::Classes/TempoClock#*default::).
+
+
+
+INSTANCEMETHODS::
+
+PRIVATE::addSynthDef, calcNextArgument, initDiff, initSynthDefs, newSynth, removePrefix, prefix, removeSynthDefs, sendSynthDefs, valueUGenFunc
+
+method::value
+Interpret a string of steno code.
+
+argument::str
+The program to run (a link::Classes/String::).
+
+
+code::
+t = Steno.new;
+t.quelle(\x, { Dust.ar(4 ! 2) });
+t.filter(\a, { |input| Ringz.ar(input, LFNoise1.kr(0.01).range(300.0, 1000.0) * [1, 1.01], 0.3) });
+t.filter(\g, { |input| CombL.ar(input, 0.2, ExpRand(0.003, 0.1), Rand(0.5, 1.3)) });
+t.value("xa");
+t.value("xa xa");
+t.value("xa xa xa");
+t.value("xag xag xag");
+::
+
+
+
+method::push
+Only one instance of steno can be the current one. "push" make this current and allocate necessary busses.
+code::
+t.push(true);
+--xaf
+--x[(xaf)(af)(af)]f
+--!x[(xaf)(af)(af)]f // force resend with the !-operator
+::
+
+argument::pushSyntax
+If true, modify the sclang interpreter preprocessor to allow to write steno programs directly. Lines that are prefixed with code::"--":: are interpreted as steno code, multiple lines are interpreted as parallel.
+
+
+method::pop
+Clears the busses and removes it.
+code::
+t.pop(true);
+::
+argument::popSyntax
+Reset interpreter to normal
+
+method::clear
+Free all ressources
+
+
+method::set
+Set and store synth arguments. All synths of that letter will be set to the same value. If you need varaiation between letters, either add some randomness or use the structural arguments passed as controls (see below under link::#-filter:: and link::#-quelle::). You can add your own controls using link::Classes/NamedControl::s.
+
+code::
+t = Steno.new;
+t.set(\a, \amp, 0.2, \zz, 1.286);
+t.settings; // settings is a dictionary of dictionaries
+::
+
+code::
+t = Steno.new;
+t.quelle(\a, { SinOscFB.ar(2 ** LFTri.kr(\modrate.kr(2)) * \freq.kr(300), \feedback.kr(0.5)) * 0.1 });
+t.quelle(\b, { SinOscFB.ar(2 ** LFTri.kr(\modrate.kr(2)) * \freq.kr(300), \feedback.kr(0.5)) * 0.1 });
+t.value("aaabbb");
+t.set(\a, \modrate, 0.4, \freq, 100, \feedback, 2.1);
+
+// as settings, any correct synth setting can be used:
+Ndef(\x, { MouseX.kr(0.1, 10, 1) });
+t.set(\b, \modrate, Ndef(\x));
+::
+
+
+Special values are: fadeTime (cross fade time), mix (sound level), through (for filters: pre vs. post level).
+code::
+t = Steno.new;
+t.set(\a, \fadeTime, 2.0);
+t.settings; // settings are a dictionary of dictionaries
+::
+
+argument::name
+Name of the synth definition
+
+argument::... keyValuePairs
+Any number of parmeters and values. Values can be anything that can be converted to a synth argument.
+
+
+method::settings
+Dictionary of synth arguments for each synth function. Each set of arguments is a dictionary.
+
+method::setGlobal
+Dictionary of synth arguments for all synth functions.
+code::
+t = Steno.new;
+t.setGlobal(\fadeTime, 2.0);
+t.globalSettings; // settings are a global dictionary
+::
+
+argument::... keyValuePairs
+Any number of parmeters and values. Values can be anything that can be converted to a synth argument.
+
+method::globalSettings
+Dictionary of synth arguments for all synth functions.
+
+method::numChannels
+Set the number of channels of the system - if running, synths defs are rebuilt and synths are restarted. If expand is true, the functions will multichannel expand.
+
+method::expand
+Set to true to make synth functions multichannel expand.
+
+method::freeAll
+Free all synths and empty current cmdLine.
+
+method::quant
+Specify the moment of changes relative to a temporal grid (see link::Classes/Quant::).
+code::
+t = Steno.new;
+t.quelle(\a, { Ringz.ar(Impulse.ar(1), { Rand(300, 700) } ! 2, 0.3) });
+t.quelle(\b, { Ringz.ar(Impulse.ar(2),{ Rand(3000, 7000) } ! 2, 0.1) });
+t.filter('?', { |input| DelayN.ar(input, 0.5, Rand(0, 0.5).round(1/8)) });
+t.filter('.', { |input| Limiter.ar(input) }); // full stop is a limiter here.
+t.quant = 1;
+t.("abaaabaa.");
+t.("aba?aabaa.");
+::
+
+
+method::quelle, filter
+These two methods take a link::Classes/Function:: and convert it into a link::Classes/SynthDef::, represented by a letter.
+
+strong::quelle:: converts it to a synth def that produces sound without an input necessary (cross fade will envelope the output). It adds to the signal on the bus.
+
+strong::filter:: converts it to a synth def that filters a signal input (cross fade will envelope the input and thus maintain decaying signals). It replaces the signal on the bus.
+
+code::
+t = Steno.new;
+t.quelle(\a, { Blip.ar(Rand(4, 16)) * 0.2 });
+t.quelle(\b, { Saw.ar(Rand(400, 700)) * 0.2 });
+t.filter(\f, { |input| CombL.ar(input, 0.2, Rand(0.01, 0.2), Rand(0.4, 2)) });
+t.value("baba");
+t.value("babaf");
+t.value("(ab)f (ab)f");
+::
+
+note::In the filter method, only the input signal is faded out when the synth is replaced by a new one. So you have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control to envelope it.::
+code::
+t.filter(\x, { |input, controls| CombL.ar(input, 0.2, 0.2, 2) + SinOsc.ar(1000, 0, 0.05) }); // this will hang!
+t.filter(\x, { |input, controls| CombL.ar(input, 0.2, 0.2, 2) + (SinOsc.ar(1000, 0, 0.05) * controls[\env]) }); // this won't
+::
+
+argument::name
+The letter which represents the synth def
+
+argument::func
+A UGen function, it takes the arguments below. For more controls to be set by the link::#-set:: method, use a link::Classes/NamedControl::.
+code::
+t = Steno.new;
+t.quelle(\a, { SinOsc.ar(Rand(0.9, 1.1) * \freq.kr(440)) * 0.2 });
+t.("aaa");
+t.set(\a, \freq, 800); // this affects all "a" synths, but none else.
+::
+
+strong::Arguments passed to the function are:::
+
+definitionlist::
+## input
+|| The input signal for the filter
+code::
+t = Steno.new;
+t.quelle(\a, { |input| SinOsc.ar(ExpRand(400, 7000), input * MouseX.kr(0, 20)) * 0.2 });
+t.quelle(\b, { |input| Saw.ar(ExpRand(400, 7000)) * input * MouseX.kr(0, 20) * 0.2 });
+t.value("baba");
+t.value("ab");
+::
+
+## controls
+|| A dictionary of further control inputs.
+It passes the following values:
+definitionlist::
+## gate
+|| Optional gate trigger that goes to zero when the synth is freed
+code::
+t = Steno.new;
+t.quelle(\a, { |input, controls| SinOsc.ar(ExpRand(400, 7000)) + (Decay.kr(1 - controls.at(\gate), \fadeTime.kr) * PinkNoise.ar) * 0.2 });
+t.value("baba");
+t.value("ab");
+::
+## index
+|| index of that specific synth (not counting internal synths needed for parentheses or square brackets).
+code::
+t = Steno.new;
+t.quelle(\a, { |input, controls| SinOsc.ar(controls.at(\index) + 1.3 * 200) * 0.2 });
+t.value("a");
+t.value("aa");
+t.value("aaaaaa");
+::
+## depth
+|| the nesting depth in the code
+code::
+t = Steno.new;
+t.quelle(\a, { |input, controls| SinOsc.ar(controls.at(\index) + 0.5pi * 100) * LFPulse.kr(1 + controls.at(\depth)) * 0.2 });
+t.value("aaaaaa");
+t.value("(aaa)aaa");
+t.value("aa((aa(aaa(a)))a)a(((a)))");
+::
+## mix
+|| the level control of the output signal
+## through (only: filter)
+|| controls the ratio previous input to filtered output signal
+## env
+|| the envelope that is used to fade in and fade out the input signal.
+::
+::
+
+argument::multiChannelExpand
+Specify whether the ugen graph should be expanded o the full number of channels (see: link::#-numChannels:: and link::#-expand::).
+
+argument::update
+Specify whether synth should be updated immediately when synth def is changed (MAY CHANGE IN THE FUTURE).
+
+
+method::declareVariables
+Add a number of variable names that take signals as value.
+
+argument::names
+An array of variable names, usually single letters (for exceptions, see: link::#-preProcess::).
+The first time, a variable name is encountered, its value becomes the signal to the left of it.
+
+
+code::
+// adding signal variables. Variable names are 0..9 here
+// the first thime they re used, they are assigned to the signal left of them
+s.boot;
+(
+t = Steno.push;
+t.setGlobal(\fadeTime, 1);
+t.declareVariables((0..9));
+t.quelle(\a, { Impulse.ar(Rand(3, 10) ! 2 * (3 ** LFNoise1.kr(0.2))) });
+t.quelle(\b, { Saw.ar(Rand(40, 600 ! 2)) * 0.01 });
+t.filter(\f, { |in| BPF.ar(in, LFNoise0.kr(6).exprange(200, 8000), 0.01) * 15 });
+t.filter(\x, { |in| LFPulse.kr(ExpRand(0.4, 35)) * in });
+t.filter('.', { |in| 0.0 }); // signal sink blocks signal.
+)
+
+// play into variables but don't listen
+--bbb0. aaa1.
+// listen to the filtered sum
+--bbb0. aaa1. 01f
+// assign filtered sum to variable and filter it again
+--bbb0. aaa1. 01f3. 3fx 3fx 3fx
+
+// changing the through controls
+--aaaff afx
+Tdef(\x, { loop { t.setGlobal(\through, 1.0.rand); 2.wait } }).play;
+::
+
+You can set the following parameters:
+definitionlist::
+##mix
+|| How much of the signal to output
+
+##through
+|| How much of the previous signal to output
+
+##feedback
+|| A value between 0.0 and 1.0 determines the feedback from the last declaration to the first declaration
+
+##assignment
+|| The number of times a variable can be assigned in succession (signals are mixed)
+::
+
+method::cmdLine
+Return most recently compiled code, after preprocessing.
+code::
+t.("ab ab");
+t.rawCmdLine; // returns "[(ab)(ab)]"
+t.cmdLine;
+::
+
+method::rawCmdLine
+Return most recently evaluated code.
+code::
+t.("ab ab");
+t.rawCmdLine; // returns "ab ab"
+::
+
+method::prevTokens
+Returns the most recent tokens (the cmdLine split into separate elements, by default letters, but this could also be otherwise, see link::#-preProcessor::).
+
+
+method::argList, synthList, busses, diff, encyclopedia, server, synthDict, synthList, maxBracketDepth
+Introspection: returns internal representations of busses, synthdefs, synths, and synth ressources.
+
+
+method::preProcess
+Specify whether the internal preProcessor is used or not. In situation where efficiency is important, it can be omitted by just writing 'correct' code.
+
+method::preProcessor
+Set the preProcessor
+
+Steno uses a link::Classes/DiffString:: parser to interpret code. You can change its tokenizer to fit your own language:
+
+code::
+t = Steno.new;
+t.quelle(\hello, { |input| SinOsc.ar(SinOsc.ar(SinOsc.ar(0.1, 0, 1, 2), (input * 10), 400, 800), 0, 0.1) });
+t.quelle(\word, { |input| SinOsc.ar(Saw.ar(SinOsc.ar(0.1 * (input * 3), 0, 1, 2), 300, 800 * (in * 100)), 0, 0.1) });
+t.preProcessor = nil; // remove default shortcuts
+t.diff.tokenizer = { |str| str.split($ ) };
+t.verbosity = 2;
+t.value("hello word word");
+t.value("hello");
+t.value("hello word hello word");
+::
+
+section::Other things to do
+
+
+code::
+// using steno to create complicated transtition patterns
+(
+t = Steno.new;
+t.preProcess = false;
+t.setGlobal(\fadeTime, 0.01);
+t.quelle(\a, { SinOsc.ar(Rand(200, 2130)) });
+t.filter(\f, { |input| LFPulse.kr(ExpRand(1, 30), 0, Rand(0.1, 0.5)) * input });
+t.filter(\g, { |input| CombC.ar(input, 0.1, Rand(0, 0.1), 1.3) });
+Pdef(\x).set(\play, { t.value(~string.postln) });
+)
+
+Pdef(\x, Pbind(\string, Prand(["a", "!afafafaf", "afgafg"], inf), \dur, Prand([1, 1/2, 2/3], inf) * 0.1 * Pbrown(0.2, 2))).play;
+
+::
+
+

@@ -1,0 +1,8 @@
+(
+	\name: 			"Steno",
+	\summary:		"Concatenative live coding metalanguage",
+	\author: 		"Julian Rohrhuber",
+	\organization: 	"Institute for Music and Media Duesseldorf",
+	\country: 		"Germany",
+	\since: 		"2014"
+)
