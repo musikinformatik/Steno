@@ -682,8 +682,9 @@ Steno {
 		);
 		//"% args: %\n".postf(token, args);
 
-		setting = ().addAll(globalSettings).addAll(settings.at(token));
-		^args ++ setting.asKeyValuePairs
+		setting = globalSettings.copy ? ();
+		settings.at(token) !? { setting.putAll(settings.at(token)) };
+		^args ++ settings.asKeyValuePairs
 
 	}
 
