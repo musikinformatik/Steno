@@ -573,7 +573,7 @@ Steno {
 	}
 
 	calcNextArguments { |token, i|
-		var previousWriteIndex, args, setting;
+		var previousWriteIndex, args, thisSetting;
 		token = token.asSymbol;
 		switch(token,
 			'(', {
@@ -682,9 +682,9 @@ Steno {
 		);
 		//"% args: %\n".postf(token, args);
 
-		setting = globalSettings.copy ? ();
-		settings.at(token) !? { setting.putAll(settings.at(token)) };
-		^args ++ settings.asKeyValuePairs
+		thisSetting = globalSettings.copy ? ();
+		settings.at(token) !? { thisSetting.putAll(settings.at(token)) };
+		^args ++ thisSetting.asKeyValuePairs
 
 	}
 
