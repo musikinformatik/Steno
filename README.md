@@ -5,6 +5,8 @@ Steno, a little concatenative livecoding language embedded in SuperCollider, mak
 
 Programs look like this: --ab[(ab)(ab)(ab)]c
 
+![ScreenShot](graph02.svg)
+
 Semantics:
 
 - For live coding it follows a *dual language approach*: You can rewrite both the steno program and its sclang interpretation at runtime. So the meaning of each letter, the synth def, can be changed and the corresponding program changes accordingly.
