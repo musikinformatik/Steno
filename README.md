@@ -5,7 +5,7 @@ Steno, a little concatenative livecoding language embedded in SuperCollider, mak
 
 Programs look like this: --ab[(ab)(ab)(ab)]c
 
-![ScreenShot](graph02.svg)
+![ScreenShot](graph02.jpg)
 
 Semantics:
 
