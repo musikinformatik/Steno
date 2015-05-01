@@ -9,7 +9,7 @@ Steno {
 	var <>quant, <settings, <globalSettings;
 	var <encyclopedia, <maxArity = 1;
 	var <monitor, <diff;
-	var <busses, <synthList, <synthDict, <argList, <variables;
+	var <busses, <synthList, <argList, <variables;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
 
