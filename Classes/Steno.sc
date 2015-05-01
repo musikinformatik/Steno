@@ -159,6 +159,7 @@ Steno {
 						string = string.drop(1);
 					};
 					if(verbosity > 0) { string.postcs };
+					this.initArguments; // quick bandaid for an init bug.
 					diff.value(string)
 				} {
 					server.closeBundle(server.latency);
@@ -334,6 +335,27 @@ Steno {
 			var args = input.postcs.clump(numChannels).keep(arity).add(controls);
 			func.valueArray(args)
 		}, multiChannelExpand, update, numChannels * arity);
+	}
+
+	filterEnvir { |name, func, multiChannelExpand, update = true, shapes|
+		var envirFunc = { |in, controls|
+			var sizes, names, input, totalSize, envir, result, signals;
+			#names, sizes = shapes.flop;
+			totalSize = sizes.sum;
+			envir = ();
+			in.keep(totalSize).clumps(sizes).do { |x, i|
+				envir.put(names[i], x)
+			};
+			result = func.value(envir, controls);
+			result = envir.putAll(result);
+			names.do { |name, i|
+				signals = signals.addAll(
+					result[name].extend(sizes[i], 0.0)
+				)
+			};
+			signals
+		};
+		this.filter(name, envirFunc, multiChannelExpand, update)
 	}
 
 	valueUGenFunc { |func, input, controls, multiChannelExpand|
@@ -523,6 +545,7 @@ Steno {
 			},
 			returnFunc: {
 				if(verbosity > 1) { this.dumpStructure };
+				this.initArguments; // just to make sure: sometimes it seems that beginFunc isn't called.
 			}
 		)
 	}
