@@ -130,12 +130,15 @@ Steno {
 		}
 	}
 
-
 	freeAll {
 		diff.init;
 		synthList.do(_.release);
 		synthList = [];
 		argList = [];
+	}
+
+	releaseHanging {
+		if(server.serverRunning) { server.sendMsg("/n_set", 1, \steno_unhang, 1.0) };
 	}
 
 	value { |string|
@@ -288,9 +291,9 @@ Steno {
 		multiChannelExpand = multiChannelExpand ? expand; // expand to full channels either when specified for this synth or global default
 		numChannels = min(numChannels ? this.numChannels, this.numChannels);
 
-		this.addSynthDef(name, { |out, in, dryIn, through = 0, mix = 1, synthIndex = 0, nestingDepth = 0, hangTime = 30|
+		this.addSynthDef(name, { |out, in, dryIn, through = 0, mix = 1, synthIndex = 0, nestingDepth = 0|
 			var output, drySignal, oldSignal, filterInput, filterOutput, detectSignal, size;
-			var gate = \gate.kr(1), fadeTime = \fadeTime.kr(0.02);
+			var gate = \gate.kr(1), fadeTime = \fadeTime.kr(0.02), gateHappened;
 			var env = EnvGen.kr(Env.asr(0, 1, fadeTime), gate);
 			var controls = (index: synthIndex, depth: nestingDepth, mix: mix, gate: gate, numChannels: numChannels, through: through, env: env);
 
@@ -305,7 +308,9 @@ Steno {
 			output = XFade2.ar(drySignal, filterOutput, mix * 2 - 1); // mix in filter output to dry signal.
 			output = output + (oldSignal * max(through, 1 - env)); // when the gate is switched off (released), let old input through
 			ReplaceOut.ar(out, output);
-			FreeSelf.kr(TDelay.kr(\gate.kr(1) <= 0, max(fadeTime, hangTime))); // remove hanging notes if necessary
+			// remove hanging notes if necessary:
+			gateHappened = \gate.kr(1) <= 0;
+			FreeSelf.kr(TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30))) + (gateHappened * \steno_unhang.tr(0)));
 			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, output.size) };
 		}, update);
 	}

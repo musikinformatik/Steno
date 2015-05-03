@@ -209,6 +209,9 @@ Set to true to make synth functions multichannel expand.
 method::freeAll
 Free all synths and empty current cmdLine.
 
+method::releaseHanging
+Free all synths that have been released but which still run as they have a filter input. This will cut long filter tails.
+
 method::quant
 Specify the moment of changes relative to a temporal grid (see link::Classes/Quant::).
 code::
@@ -240,7 +243,7 @@ t.value("babaf");
 t.value("(ab)f (ab)f");
 ::
 
-warning::In the filter method, only the input signal is faded out when the synth is replaced by a new one. So you have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control to envelope it. There is a synth control input called code::hangTime:: that at least removes hanging notes (after 30 sec by default).::
+warning::In the filter method, when the synth is replaced by a new one, only the input signal is faded out. So you have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control or code::controls[\env]:: to envelope it. There is a synth control input called code::hangTime:: that removes hanging notes after some longer time (after 30 sec by default). You can manually release all potentially hanging synths by calling link::#-releaseHanging::.::
 code::
 t.filter(\x, { |input, controls| CombL.ar(input, 0.2, 0.2, 2) + SinOsc.ar(1000, 0, 0.05) }); // this will hang!
 t.filter(\x, { |input, controls| CombL.ar(input, 0.2, 0.2, 2) + (SinOsc.ar(1000, 0, 0.05) * controls[\env]) }); // this won't
