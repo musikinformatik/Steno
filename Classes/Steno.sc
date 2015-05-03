@@ -113,6 +113,7 @@ Steno {
 	}
 
 	// seems not to work properly yet.
+	/*
 	bus_ { |argBus|
 		if(argBus.isNumber.not and: { argBus.numChannels < numChannels or: { argBus.rate != \audio }}) {
 			Error("bus must be audio rate and have at least have % channels".format(numChannels)).throw
@@ -120,6 +121,7 @@ Steno {
 		bus = argBus;
 		this.rebuild;
 	}
+	*/
 
 	rebuild {
 		fork {
