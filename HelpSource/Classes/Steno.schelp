@@ -105,7 +105,7 @@ PRIVATE::addSynthDef, calcNextArgument, initDiff, initSynthDefs, newSynth, remov
 method::value
 Interpret a string of steno code.
 
-argument::str
+argument::string
 The program to run (a link::Classes/String::).
 
 
@@ -316,6 +316,8 @@ Specify whether the ugen graph should be expanded o the full number of channels 
 argument::update
 Specify whether synth should be updated immediately when synth def is changed (MAY CHANGE IN THE FUTURE).
 
+argument::numChannels
+Specify a number of channels the function should have (by default, it uses link::#-numChannels::).
 
 method::declareVariables
 Add a number of variable names that take signals as value.
@@ -386,7 +388,7 @@ method::prevTokens
 Returns the most recent tokens (the cmdLine split into separate elements, by default letters, but this could also be otherwise, see link::#-preProcessor::).
 
 
-method::argList, synthList, busses, diff, encyclopedia, server, synthDict, synthList, maxBracketDepth
+method::argList, synthList, busses, diff, encyclopedia, server, synthList, maxBracketDepth
 Introspection: returns internal representations of busses, synthdefs, synths, and synth ressources.
 
 
