@@ -133,6 +133,7 @@ Steno {
 	freeAll {
 		diff.init;
 		synthList.do(_.release);
+		this.releaseHanging;
 		synthList = [];
 		argList = [];
 	}
