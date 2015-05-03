@@ -286,7 +286,7 @@ Steno {
 
 	filter { |name, func, multiChannelExpand, update = true, numChannels|
 		multiChannelExpand = multiChannelExpand ? expand; // expand to full channels either when specified for this synth or global default
-		numChannels = numChannels ? this.numChannels;
+		numChannels = min(numChannels ? this.numChannels, this.numChannels);
 
 		this.addSynthDef(name, { |out, in, dryIn, through = 0, mix = 1, synthIndex = 0, nestingDepth = 0, hangTime = 30|
 			var output, drySignal, oldSignal, filterInput, filterOutput, detectSignal, size;
@@ -310,9 +310,10 @@ Steno {
 		}, update);
 	}
 
-	quelle { |name, func, multiChannelExpand, update = true|
+	quelle { |name, func, multiChannelExpand, update = true, numChannels|
 
 		multiChannelExpand = multiChannelExpand ? expand;
+		numChannels = min(numChannels ? this.numChannels, this.numChannels);
 
 		this.addSynthDef(name, { |out, in, mix = 1, synthIndex = 0, nestingDepth = 0|
 			var gate = \gate.kr(1);
