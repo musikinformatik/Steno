@@ -100,7 +100,7 @@ The current Steno instance (like e.g. link::Classes/TempoClock#*default::).
 
 INSTANCEMETHODS::
 
-PRIVATE::addSynthDef, calcNextArgument, initDiff, initSynthDefs, newSynth, removePrefix, prefix, removeSynthDefs, sendSynthDefs, valueUGenFunc
+PRIVATE:: addSynthDef, initArguments, initDiff, initSynthDefs, initBusses, calcNextArguments, getBusArgs, newSynth, removePrefix, prefix, removeSynthDefs, sendSynthDefs, valueUGenFunc, startMonitor
 
 method::value
 Interpret a string of steno code.
@@ -371,6 +371,22 @@ definitionlist::
 ##assignment
 || The number of times a variable can be assigned in succession (signals are mixed)
 ::
+
+method::variables
+Returns a dictionary of variables, if defined.
+
+
+method::resendSynths
+Restart all synths and release hanging notes.
+
+method::rebuild
+Generate new SynthDefs and restart all synths.
+
+method::bus
+The bus internally used for routing the signals.
+
+method::monitor
+Returns the monitor synth which maps the last output to the hardware output channels
 
 method::cmdLine
 Return most recently compiled code, after preprocessing.
