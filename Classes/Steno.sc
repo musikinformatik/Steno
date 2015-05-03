@@ -723,7 +723,7 @@ Steno {
 
 	*defaultPreProcessor {
 		^#{ |str, steno|
-			var newStr = str.class.new, doResend = false, currentClump = str.class.new;
+			var newStr = str.class.new, doResend = false, currentClump = str.class.new, firstBracketIndex, firstGapIndex;
 
 			if(str.isNil) {
 				str = steno.cmdLine ? str.class.new; doResend = true;
@@ -733,7 +733,9 @@ Steno {
 			};
 			// bring the string into regular form
 			str = str.checkBrackets(true, steno.verbosity > 0, steno.maxBracketDepth);
-			if(str.find(" ").notNil and: { "([".includes(str[0]).not } ) { str = "[%]".format(str) };
+			firstBracketIndex = str.findAllRegexp("[\[\(]").minItem;
+			firstGapIndex = str.find(" ");
+			if(firstGapIndex.notNil and: { firstBracketIndex.isNil or: { firstBracketIndex > firstGapIndex }} ) { str = "[%]".format(str) };
 			str.doBrackets({ |char, i, scope, outerScope|
 				var fstr;
 				if("([".includes(char)) {
