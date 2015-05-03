@@ -169,7 +169,7 @@ t.set(\b, \modrate, Ndef(\x));
 ::
 
 
-Special values are: fadeTime (cross fade time), mix (sound level), through (for filters: pre vs. post level).
+Special values are: strong::fadeTime:: (cross fade time, default: 0.02), strong::mix:: (sound level, default: 1), strong::through:: (for filters: pre vs. post level, default: 0), and strong::hangTime:: (for filters, as a maximum release tail length, unless fadeTime is longer (default: 30)).
 code::
 t = Steno.new;
 t.set(\a, \fadeTime, 2.0);
@@ -187,7 +187,7 @@ method::settings
 Dictionary of synth arguments for each synth function. Each set of arguments is a dictionary.
 
 method::setGlobal
-Dictionary of synth arguments for all synth functions.
+Dictionary of synth arguments for all synth functions (for Special values, see link::#-set::).
 code::
 t = Steno.new;
 t.setGlobal(\fadeTime, 2.0);
@@ -240,7 +240,7 @@ t.value("babaf");
 t.value("(ab)f (ab)f");
 ::
 
-note::In the filter method, only the input signal is faded out when the synth is replaced by a new one. So you have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control to envelope it.::
+warning::In the filter method, only the input signal is faded out when the synth is replaced by a new one. So you have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control to envelope it. There is a synth control input called code::hangTime:: that at least removes hanging notes (after 30 sec by default).::
 code::
 t.filter(\x, { |input, controls| CombL.ar(input, 0.2, 0.2, 2) + SinOsc.ar(1000, 0, 0.05) }); // this will hang!
 t.filter(\x, { |input, controls| CombL.ar(input, 0.2, 0.2, 2) + (SinOsc.ar(1000, 0, 0.05) * controls[\env]) }); // this won't
