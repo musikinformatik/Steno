@@ -360,6 +360,9 @@ Steno {
 				envir.put(names[i], x)
 			};
 			result = func.value(envir, controls);
+			if(result.isKindOf(Dictionary).not) {
+				"UGen function should return a dictionary with signals".error;
+			};
 			result = envir.putAll(result);
 			names.do { |name, i|
 				var signal = result[name];
