@@ -112,19 +112,18 @@ Steno {
 		this.rebuild;
 	}
 
-	// seems not to work properly yet.
-	/*
 	bus_ { |argBus|
-		if(argBus.isNumber.not and: { argBus.numChannels < numChannels or: { argBus.rate != \audio }}) {
+		if(argBus.isNumber.not and: { argBus.rate != \audio }) {
 			Error("bus must be audio rate and have at least have % channels".format(numChannels)).throw
 		};
 		bus = argBus;
 		this.rebuild;
 	}
-	*/
 
 	rebuild {
 		fork {
+			this.initBusses;
+			this.initSynthDefs;
 			this.rebuildSynthDefs;
 			server.sync;
 			this.resendSynths;
@@ -305,7 +304,7 @@ Steno {
 			drySignal = In.ar(dryIn, numChannels);        // dry signal (may come from another bus, but mostly is same as in)
 
 
-			filterOutput = this.valueUGenFunc(func, filterInput, controls, multiChannelExpand);
+			filterOutput = this.valueUGenFunc(func, filterInput, controls, multiChannelExpand, numChannels);
 			detectSignal = (gate * 100) + LeakDC.ar(filterOutput.asArray.sum); // free the synth only if gate is 0.
 			DetectSilence.ar(detectSignal, time: 0.01, doneAction:2); // free the synth when gate = 0 and fx output is silent
 			output = XFade2.ar(drySignal, filterOutput, mix * 2 - 1); // mix in filter output to dry signal.
@@ -329,7 +328,7 @@ Steno {
 			var input = In.ar(in, numChannels);
 			var controls = (index: synthIndex, depth: nestingDepth, env: env, mix: mix, gate: gate, numChannels: numChannels);
 
-			var output = this.valueUGenFunc(func, input, controls, multiChannelExpand);
+			var output = this.valueUGenFunc(func, input, controls, multiChannelExpand, numChannels);
 
 			output = output * (mix * env) + input;
 			ReplaceOut.ar(out, output); // can't use Out here, because in can be different than out
@@ -377,18 +376,18 @@ Steno {
 		this.filter(name, envirFunc, false, update, numChannels)
 	}
 
-	valueUGenFunc { |func, input, controls, multiChannelExpand|
+	valueUGenFunc { |func, input, controls, multiChannelExpand, argNumChannels|
 		var output = func.value(input.asArray, controls).asArray;
 		var size = output.size;
 
-		if(multiChannelExpand and: { size < numChannels }) { // make it once more, this time the right size.
-			output = ({ func.value(input.asArray, controls) } ! (numChannels div: size).max(1)).flatten(1).keep(numChannels);
+		if(multiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
+			output = ({ func.value(input.asArray, controls) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
 		};
 		if(output.isNil) { output = [0.0] };
-		if(output.rate !== \audio) { output = K2A.ar(output) }; // convert output rate if necessary
-		if(output.size > numChannels) {
-			output = SplayAz.ar(numChannels, output);  // definitely limit number of channels. // here we could also just keep n channels instead?
-			if(verbosity > 0) { "Mapped synth def function channels from % to % channels\n".postf(output.size, numChannels) };
+		output = output.collect { |x| if(x.rate !== \audio) { K2A.ar(x) } { x } };  // convert output rate if necessary
+		if(output.size > argNumChannels) {
+			output = SplayAz.ar(argNumChannels, output);  // definitely limit number of channels. // here we could also just keep n channels instead?
+			if(verbosity > 0) { "Mapped synth def function channels from % to % channels\n".postf(output.size, argNumChannels) };
 		};
 		^output
 	}

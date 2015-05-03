@@ -383,10 +383,13 @@ method::rebuild
 Generate new SynthDefs and restart all synths.
 
 method::bus
-The bus internally used for routing the signals.
+The output bus.
+
+method::busses
+An array of busses used internally for signal routing
 
 method::monitor
-Returns the monitor synth which maps the last output to the hardware output channels
+Returns the monitor synth which maps the last output to the output bus (default: 0).
 
 method::cmdLine
 Return most recently compiled code, after preprocessing.
