@@ -305,7 +305,7 @@ Steno {
 			output = XFade2.ar(drySignal, filterOutput, mix * 2 - 1); // mix in filter output to dry signal.
 			output = output + (oldSignal * max(through, 1 - env)); // when the gate is switched off (released), let old input through
 			ReplaceOut.ar(out, output);
-			FreeSelf.kr(TDelay.kr(\gate.kr(1) <= 0, max(fadeTime, hangTime)); // remove hanging notes if necessary
+			FreeSelf.kr(TDelay.kr(\gate.kr(1) <= 0, max(fadeTime, hangTime))); // remove hanging notes if necessary
 			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, output.size) };
 		}, update);
 	}
