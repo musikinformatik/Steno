@@ -86,6 +86,8 @@ DiffString {
 			var oldToken, newToken, tab = Char.tab;
 			var operator, opIndex, firstTabIndex, returnValue;
 
+			if(line[line.lastIndex] == $|) { line = line.drop(-1).add($<); }; // fix for alternative removal syntax
+
 			opIndex = line.findBackwards("\t");
 			firstTabIndex = line.find("\t");
 			if(opIndex.isNil or: firstTabIndex.isNil) { this.prError };
@@ -98,6 +100,7 @@ DiffString {
 			if(operator == tab) { if(line.last == $<) { operator = $< } };
 			if(oldToken == tab.asString) { operator = $> }; // assumption
 			if(verbose) {
+				postcs(line);
 				postf("operator: %, index: %\noldToken: %\nnewToken: %\n", operator.cs, i, oldToken.cs, newToken.cs);
 			};
 
@@ -113,7 +116,7 @@ DiffString {
 				// removing
 				$<, {
 					if(verbose) { postln("removing" + oldToken) };
-					if(testFunc.value(i, operator, oldToken, newToken)) {
+					if(testFunc.value(i, operator, oldToken, "")) { // newToken should be nothing when removing.
 						removeFunc.value(oldToken, i)
 					};
 				},
@@ -121,7 +124,7 @@ DiffString {
 				$>, {
 					if(verbose) { postln("inserting" + newToken) };
 					index = index + 1;
-					if(testFunc.value(i, operator, oldToken, newToken)) {
+					if(testFunc.value(i, operator, "", newToken)) { // oldToken should be nothing when inserting.
 						insertFunc.value(newToken, i);
 					};
 				},
