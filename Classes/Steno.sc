@@ -338,25 +338,35 @@ Steno {
 		}, multiChannelExpand, update, numChannels * arity);
 	}
 
-	filterEnvir { |name, func, multiChannelExpand, update = true, shapes|
-		var envirFunc = { |in, controls|
-			var sizes, names, input, totalSize, envir, result, signals;
-			#names, sizes = shapes.flop;
-			totalSize = sizes.sum;
+	filterEnvir { |name, func, multiChannelExpand, update = true, shapes| // multiChannelExpand not yet supported.
+		var sizes, names, numChannels, envirFunc;
+		#names, sizes = shapes.flop;
+		numChannels = sizes.sum;
+		if(numChannels > this.numChannels) { "Too many channels defined in shape".warn; ^this };
+
+		envirFunc = { |in, controls|
+			var input, envir, result, signals, allInputs;
+
 			envir = ();
-			in.keep(totalSize).clumps(sizes).do { |x, i|
+			allInputs = in.keep(numChannels).clumps(sizes);
+			allInputs.do { |x, i|
 				envir.put(names[i], x)
 			};
 			result = func.value(envir, controls);
 			result = envir.putAll(result);
 			names.do { |name, i|
-				signals = signals.addAll(
-					result[name].extend(sizes[i], 0.0)
-				)
+				var signal = result[name];
+				var oldSignal = allInputs[i];
+				var newSignal = oldSignal.collect { |old, j|
+					var new = signal.asArray[j];
+					if(new.isNil) { old } { new }
+				};
+				signals = signals.addAll(newSignal)
 			};
 			signals
 		};
-		this.filter(name, envirFunc, multiChannelExpand, update)
+		//it would be probably much better if we had a more selective choice for filter/quelle
+		this.filter(name, envirFunc, false, update, numChannels)
 	}
 
 	valueUGenFunc { |func, input, controls, multiChannelExpand|
