@@ -289,6 +289,74 @@ Steno {
 
 	///////////////// wrappers for UGen functions ///////////////////////
 
+	// external interface
+
+	filter { |name, func, multiChannelExpand, update = true, numChannels|
+		numChannels = min(numChannels ? this.numChannels, this.numChannels);
+		this.addSynthDef(name, { |out, in|
+			var output = this.wrapFilter(func, in, out, numChannels, multiChannelExpand);
+			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, output.size) };
+		}, update);
+	}
+
+	quelle { |name, func, multiChannelExpand, update = true, numChannels|
+
+		numChannels = min(numChannels ? this.numChannels, this.numChannels);
+		this.addSynthDef(name, { |out, in|
+			var output = this.wrapQuelle(func, in, out, numChannels, multiChannelExpand);
+			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, output.size) };
+		}, update);
+	}
+
+	// these two wrappers are general (potentially Steno unspecific)
+
+	wrapFilter { |func, inBus, outBus, numChannels, multiChannelExpand|
+		var output, drySignal, oldSignal, filterInput, filterOutput, detectSignal;
+		var gate = \gate.kr(1), fadeTime = \fadeTime.kr(0.02), gateHappened;
+		var env = EnvGen.kr(Env.asr(0, 1, fadeTime), gate);
+		var mix = \mix.kr(1), through = \through.kr(0), dryIn = \dryIn.kr(0);
+		var synthIndex = \synthIndex.kr(0), depth = \nestingDepth.kr(0);
+		var controls = (gate: gate, env: env, mix: mix, through: through,
+			numChannels: numChannels, index: synthIndex, depth: depth);
+
+		filterInput = In.ar(inBus, numChannels) * env;   // gate the input, not the output
+		oldSignal = In.ar(outBus, numChannels);          // previous signal on bus
+		drySignal = In.ar(dryIn, numChannels);        // dry signal (may come from another bus, but mostly is same as in)
+
+
+		filterOutput = this.valueUGenFunc(func, filterInput, controls, multiChannelExpand, numChannels);
+		detectSignal = (gate * 100) + LeakDC.ar(filterOutput.asArray.sum); // free the synth only if gate is 0.
+		DetectSilence.ar(detectSignal, time: 0.01, doneAction:2); // free the synth when gate = 0 and fx output is silent
+		output = XFade2.ar(drySignal, filterOutput, mix * 2 - 1); // mix in filter output to dry signal.
+		output = output + (oldSignal * max(through, 1 - env)); // when the gate is switched off (released), let old input through
+		ReplaceOut.ar(outBus, output);
+
+		// remove hanging notes if necessary:
+		gateHappened = gate <= 0;
+		FreeSelf.kr(TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30))) + (gateHappened * \steno_unhang.tr(0)));
+		^output
+	}
+
+	wrapQuelle { |func, inBus, outBus, numChannels, multiChannelExpand|
+		var gate = \gate.kr(1), fadeTime = \fadeTime.kr(0.02), gateHappened;
+		var env = EnvGen.kr(Env.asr(0, 1, fadeTime), gate);
+		var mix = \mix.kr(1), through = \through.kr(0), dryIn = \dryIn.kr(0);
+		var synthIndex = \synthIndex.kr(0), depth = \nestingDepth.kr(0);
+		var controls = (gate: gate, env: env, mix: mix, through: through,
+			numChannels: numChannels, index: synthIndex, depth: depth);
+		var input = In.ar(inBus, numChannels);
+		var output = this.valueUGenFunc(func, input, controls, multiChannelExpand, numChannels);
+
+		output = output * (mix * env) + input;
+
+		ReplaceOut.ar(outBus, output); // can't use Out here, because in can be different than out
+		^output
+	}
+
+
+
+	/*
+
 	filter { |name, func, multiChannelExpand, update = true, numChannels|
 		multiChannelExpand = multiChannelExpand ? expand; // expand to full channels either when specified for this synth or global default
 		numChannels = min(numChannels ? this.numChannels, this.numChannels);
@@ -317,6 +385,7 @@ Steno {
 		}, update);
 	}
 
+
 	quelle { |name, func, multiChannelExpand, update = true, numChannels|
 
 		multiChannelExpand = multiChannelExpand ? expand;
@@ -335,6 +404,8 @@ Steno {
 			if(verbosity > 0) { ("new source synth def: \"%\" with % channels\n").postf(name, output.size) };
 		}, update);
 	}
+	*/
+
 
 	operator { |name, func, arity = 2, multiChannelExpand, update = true|
 		if(arity > maxArity) { Error("this operator has too many arguments. Increase maxArity if you need more").throw };
@@ -382,6 +453,9 @@ Steno {
 	valueUGenFunc { |func, input, controls, multiChannelExpand, argNumChannels|
 		var output = func.value(input.asArray, controls).asArray;
 		var size = output.size;
+
+		multiChannelExpand = multiChannelExpand ? expand; // expand to full channels either when specified for this synth or global default
+
 
 		if(multiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
 			output = ({ func.value(input.asArray, controls) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
@@ -720,7 +794,7 @@ Steno {
 				effectiveSynthIndex = effectiveSynthIndex + 1; // only count up for normal synths, not for brackets
 				tokenIndices[token] = tokenIndices[token] + 1;
 				if(argumentIndex.notNil) {
-						argumentIndex = argumentIndex + 1 % maxArity
+					argumentIndex = argumentIndex + 1 % maxArity
 				};
 			}
 		);
@@ -744,7 +818,7 @@ Steno {
 
 	*defaultPreProcessor {
 		^#{ |str, steno|
-			var newStr = str.class.new, doResend = false, currentClump = str.class.new, firstBracketIndex, firstGapIndex;
+			var newStr = str.class.new, doResend = false, currentClump = str.class.new, hasGap = false;
 
 			if(str.isNil) {
 				str = steno.cmdLine ? str.class.new; doResend = true;
@@ -752,11 +826,15 @@ Steno {
 				if(str[0] == $!) { doResend = true; str = str.drop(1); };
 				str = str.replace("\n", " ");
 			};
-			// bring the string into regular form
-			str = str.checkBrackets(true, steno.verbosity > 0, steno.maxBracketDepth);
-			firstBracketIndex = str.findAllRegexp("[\[\(]").minItem;
-			firstGapIndex = str.find(" ");
-			if(firstGapIndex.notNil and: { firstBracketIndex.isNil or: { firstBracketIndex > firstGapIndex }} ) { str = "[%]".format(str) };
+
+			// bring the string into regular form: if it has a gap on the top level ...
+			str = str.doBrackets({ |token, i, scope, outerScope, scopeStack|
+				if(token.isSpace and: { scopeStack.isEmpty }) {
+					hasGap = true
+				};
+			}, true, steno.verbosity > 0, steno.maxBracketDepth);
+			if(hasGap) { str = "[%]".format(str) }; // ... assume parallel parts
+
 			str.doBrackets({ |char, i, scope, outerScope|
 				var fstr;
 				if("([".includes(char)) {
@@ -829,7 +907,7 @@ Steno {
 				scopeStack.add(scope);
 				outerScope = scope;
 				scope = ();
-				func.value(token, i, scope, outerScope);
+				func.value(token, i, scope, outerScope, scopeStack);
 				newString.add(token);
 			} {
 				foundClosing = pairs.getID(token);
@@ -840,12 +918,12 @@ Steno {
 					} {
 						stack.pop;
 						outerScope = scopeStack.pop;
-						func.value(token, i, scope, outerScope);
+						func.value(token, i, scope, outerScope, scopeStack);
 						scope = outerScope;
 						newString.add(token);
 					}
 				} {
-					func.value(token, i, scope, outerScope);
+					func.value(token, i, scope, outerScope, scopeStack);
 					newString.add(token);
 				}
 			};
@@ -906,9 +984,9 @@ Steno {
 			// if parallel, link to top.
 
 			if(scope[\modus] == \parallel) {
-					scope[\upLinks] = scope[\upLinks].add(i);
+				scope[\upLinks] = scope[\upLinks].add(i);
 			} {
-					scope[\prevNode] = i;
+				scope[\prevNode] = i;
 			};
 
 			// switch modus
