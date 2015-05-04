@@ -744,7 +744,7 @@ Steno {
 
 	*defaultPreProcessor {
 		^#{ |str, steno|
-			var newStr = str.class.new, doResend = false, currentClump = str.class.new, firstBracketIndex, firstGapIndex;
+			var newStr = str.class.new, doResend = false, currentClump = str.class.new, hasGap = false;
 
 			if(str.isNil) {
 				str = steno.cmdLine ? str.class.new; doResend = true;
@@ -752,11 +752,15 @@ Steno {
 				if(str[0] == $!) { doResend = true; str = str.drop(1); };
 				str = str.replace("\n", " ");
 			};
-			// bring the string into regular form
-			str = str.checkBrackets(true, steno.verbosity > 0, steno.maxBracketDepth);
-			firstBracketIndex = str.findAllRegexp("[\[\(]").minItem;
-			firstGapIndex = str.find(" ");
-			if(firstGapIndex.notNil and: { firstBracketIndex.isNil or: { firstBracketIndex > firstGapIndex }} ) { str = "[%]".format(str) };
+
+			// bring the string into regular form: if it has a gap on the top level ...
+			str = str.doBrackets({ |token, i, scope, outerScope, scopeStack|
+				if(token.isSpace and: { scopeStack.isEmpty }) {
+					hasGap = true
+				};
+			}, true, steno.verbosity > 0, steno.maxBracketDepth);
+			if(hasGap) { str = "[%]".format(str) }; // ... assume parallel parts
+
 			str.doBrackets({ |char, i, scope, outerScope|
 				var fstr;
 				if("([".includes(char)) {
@@ -829,7 +833,7 @@ Steno {
 				scopeStack.add(scope);
 				outerScope = scope;
 				scope = ();
-				func.value(token, i, scope, outerScope);
+				func.value(token, i, scope, outerScope, scopeStack);
 				newString.add(token);
 			} {
 				foundClosing = pairs.getID(token);
@@ -840,12 +844,12 @@ Steno {
 					} {
 						stack.pop;
 						outerScope = scopeStack.pop;
-						func.value(token, i, scope, outerScope);
+						func.value(token, i, scope, outerScope, scopeStack);
 						scope = outerScope;
 						newString.add(token);
 					}
 				} {
-					func.value(token, i, scope, outerScope);
+					func.value(token, i, scope, outerScope, scopeStack);
 					newString.add(token);
 				}
 			};
@@ -906,9 +910,9 @@ Steno {
 			// if parallel, link to top.
 
 			if(scope[\modus] == \parallel) {
-					scope[\upLinks] = scope[\upLinks].add(i);
+				scope[\upLinks] = scope[\upLinks].add(i);
 			} {
-					scope[\prevNode] = i;
+				scope[\prevNode] = i;
 			};
 
 			// switch modus
