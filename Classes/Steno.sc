@@ -317,7 +317,7 @@ Steno {
 
 		numChannels = min(numChannels ? this.numChannels, this.numChannels);
 		this.addSynthDef(name, { |in, out|
-			var stenoSignal = StenoSignal(in, out, numChannels);
+			var stenoSignal = StenoSignal(in, out, numChannels, multiChannelExpand);
 			func.value(stenoSignal.input, stenoSignal);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, numChannels) };

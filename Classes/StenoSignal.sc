@@ -1,13 +1,13 @@
 
 StenoSignal {
-	var <inBus, <outBus, <numChannels;
+	var <inBus, <outBus, <numChannels, <multiChannelExpand;
 	var <env, <gate, <fadeTime, <mix, <through, <dryIn;
 	var <synthIndex, <depth, <input;
 	var outputSignals;
 
-	*new { |inBus, outBus, numChannels|
+	*new { |inBus, outBus, numChannels, multiChannelExpand = false|
 		if(UGen.buildSynthDef.isNil) { "steno signal only works inside a ugen graph".warn };
-		^super.newCopyArgs(inBus, outBus, numChannels).init
+		^super.newCopyArgs(inBus, outBus, numChannels, multiChannelExpand).init
 	}
 
 	init {
@@ -22,31 +22,27 @@ StenoSignal {
 		input = In.ar(inBus, numChannels).asArray;
 	}
 
-	addOutput { |signal|
-		signal = signal.asArray;
-		if(outputSignals.size + signal.size > numChannels) {
-			"too many signals added, ignoring them".warn;
+	// get filter input
+	filterInput { |argNumChannels|
+		var sig = input.drop(this.offset);
+		if(argNumChannels.notNil) {
+			sig = sig.keep(argNumChannels);
+			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
 		};
-		outputSignals = outputSignals.addAll(signal)
+		^sig * env
 	}
 
-	writeToBus {
-		ReplaceOut.ar(outBus, outputSignals.keep(numChannels))
-	}
+	// set filter output
+	filterOutput { |signal, argNumChannels|
+		var gateHappened, detectSignal, oldSignal, drySignal, offset;
+		offset = this.offset;
+		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
-	filterInput { |argNumChannels, offset|
-		^if(argNumChannels.notNil) {
-			input.drop(offset).keep(argNumChannels) * env
-		} {
-			input * env
-		}
-	}
-
-	filterOutput { |signal, argNumChannels, offset|
-		var gateHappened;
-		var detectSignal = (gate * 100) + LeakDC.ar(signal.asArray.sum); // free the synth only if gate is 0.
-		var oldSignal = In.ar(outBus, numChannels);          // previous signal on bus
-		var drySignal = In.ar(dryIn, numChannels);        // dry signal (may come from another bus, but mostly is same as in)
+		signal = signal.asArray.keep(argNumChannels);
+		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
+		detectSignal = (gate * 100) + LeakDC.ar(signal.sum); // free the synth only if gate is 0.
+		oldSignal = In.ar(outBus + offset, numChannels);          // previous signal on bus
+		drySignal = In.ar(dryIn + offset, numChannels);        // dry signal (may come from another bus, but mostly is same as in)
 		DetectSilence.ar(detectSignal, time: 0.01, doneAction:2); // free the synth when gate = 0 and fx output is silent
 		signal = XFade2.ar(drySignal, signal, mix * 2 - 1); // mix in filter output to dry signal.
 		signal = signal + (oldSignal * max(through, 1 - env)); // when the gate is switched off (released), let old input through
@@ -57,25 +53,60 @@ StenoSignal {
 		this.addOutput(signal);
 	}
 
-	quelleInput {
-		^input
+	// get quelle input
+	quelleInput { |argNumChannels|
+		var sig = input.drop(this.offset);
+		if(argNumChannels.notNil) {
+			sig = sig.keep(argNumChannels);
+			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
+		};
+		^sig
 	}
 
-	quelleOutput { |signal|
-		signal = signal * (mix * env) + input;  // can't use Out here, because in can be different than out
+	// set quelle output
+	quelleOutput { |signal, argNumChannels|
+		var localMix, localInput, offset;
+		offset = this.offset;
+		argNumChannels = min(argNumChannels ? numChannels, numChannels - offset); // avoid overrun of total channels given
+
+		signal = signal.asArray.keep(argNumChannels);
+		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
+		localInput = input.asArray.drop(offset).keep(argNumChannels);
+		signal = signal * (mix * env) + localInput;  // can't use Out here, because in can be different than out
 		this.addOutput(signal);
 	}
 
+	// unique filter definition
 	filter { |func, multiChannelExpand, argNumChannels|
 		var inputSignal = this.filterInput;
 		var signal = this.valueUGenFunc(func, inputSignal, multiChannelExpand, argNumChannels);
 		this.filterOutput(signal);
 	}
 
+	// unique quelle definition
 	quelle { |func, multiChannelExpand, argNumChannels|
 		var inputSignal = this.quelleInput;
 		var signal = this.valueUGenFunc(func, inputSignal, multiChannelExpand, argNumChannels);
 		this.filterOutput(signal);
+	}
+
+	addOutput { |signal|
+		signal = signal.asArray;
+		if(outputSignals.size + signal.size > numChannels) {
+			"too many signals added, ignoring them:".warn;
+			outputSignals.postcs;
+		};
+		outputSignals = outputSignals.addAll(signal);
+	}
+
+	offset {
+		^min(outputSignals.size, numChannels)
+	}
+
+	writeToBus {
+		outputSignals !? {
+			ReplaceOut.ar(outBus, outputSignals.keep(numChannels))
+		}
 	}
 
 	valueUGenFunc { |func, inputSignal, multiChannelExpand, argNumChannels|
