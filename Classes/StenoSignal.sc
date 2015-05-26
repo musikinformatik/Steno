@@ -20,16 +20,17 @@ StenoSignal {
 		synthIndex = \synthIndex.kr(0);
 		depth = \nestingDepth.kr(0);
 		input = In.ar(inBus, numChannels).asArray;
+		outputSignals = Array.fill(numChannels, 0.0);
 	}
 
 	// get filter input
-	filterInput { |argNumChannels|
-		^this.quelleInput(argNumChannels) * env
+	filterInput { |argNumChannels, offset = 0|
+		^this.quelleInput(argNumChannels, offset) * env
 	}
 
 	// get quelle input
-	quelleInput { |argNumChannels|
-		var sig = input.drop(this.offset);
+	quelleInput { |argNumChannels, offset = 0|
+		var sig = input.drop(offset);
 		if(argNumChannels.notNil) {
 			sig = sig.keep(argNumChannels);
 			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
@@ -38,9 +39,9 @@ StenoSignal {
 	}
 
 	// set filter output
-	filterOutput { |signal, argNumChannels|
-		var gateHappened, detectSignal, oldSignal, drySignal, offset;
-		offset = this.offset;
+	filterOutput { |signal, argNumChannels, offset = 0|
+		var gateHappened, detectSignal, oldSignal, drySignal;
+
 		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
@@ -55,20 +56,19 @@ StenoSignal {
 		// remove hanging notes if necessary:
 		gateHappened = gate <= 0;
 		FreeSelf.kr(TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30))) + (gateHappened * \steno_unhang.tr(0)));
-		this.addOutput(signal);
+		this.addOutput(signal, offset);
 	}
 
 	// set quelle output
-	quelleOutput { |signal, argNumChannels|
-		var localMix, localInput, offset;
-		offset = this.offset;
+	quelleOutput { |signal, argNumChannels, offset = 0|
+		var localMix, localInput;
 		argNumChannels = min(argNumChannels ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
 		localInput = input.asArray.drop(offset).keep(argNumChannels);
 		signal = signal * (mix * env) + localInput;  // can't use Out here, because in can be different than out
-		this.addOutput(signal);
+		this.addOutput(signal, offset);
 	}
 
 	// unique filter definition
@@ -85,21 +85,22 @@ StenoSignal {
 		this.filterOutput(signal);
 	}
 
-	addOutput { |signal|
+	addOutput { |signal, offset = 0|
 		signal = signal.asArray;
-		if(outputSignals.size + signal.size > numChannels) {
+		if(signal.shape.size > 1) { "wrong signal shape".warn; signal.postcs };
+		if(signal.size + offset > numChannels) {
 			"too many signals added, ignoring them:".warn;
 			outputSignals.postcs;
 		};
-		outputSignals = outputSignals.addAll(signal);
-	}
-
-	offset {
-		^min(outputSignals.size, numChannels)
+		signal.do { |channel, i|
+			i = i + offset;
+			outputSignals[i] = outputSignals[i] + channel;
+		}
 	}
 
 	writeToBus {
 		outputSignals !? {
+			outputSignals.keep(numChannels).postcs;
 			ReplaceOut.ar(outBus, outputSignals.keep(numChannels))
 		}
 	}

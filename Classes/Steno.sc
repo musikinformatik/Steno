@@ -325,12 +325,22 @@ Steno {
 	}
 
 	operator { |name, func, arity = 2, multiChannelExpand, update = true|
+		var numChannels = this.numChannels;
+		var totalNumChannels = numChannels * arity;
 		if(arity > maxArity) { Error("this operator has too many arguments. Increase maxArity if you need more").throw };
 		"Building operator '%' with an arity of %\n".postf(name, arity);
-		this.filter(name, { |input, controls|
-			var args = input.postcs.clump(numChannels).keep(arity).add(controls);
-			func.valueArray(args)
-		}, multiChannelExpand, update, numChannels * arity);
+
+		this.addSynthDef(name, { |in, out|
+			var stenoSignal = StenoSignal(in + (2 * numChannels), out, totalNumChannels);
+			var inputs = { |i|
+				stenoSignal.filterInput(numChannels, i * numChannels);
+			} ! arity;
+			var outputs = func.value(*inputs.keep(arity)).keep(numChannels); // todo pass controls?
+			stenoSignal.filterOutput(outputs, numChannels);
+			stenoSignal.writeToBus;
+			ReplaceOut.ar(in + numChannels, Silent.ar(arity - 1 * numChannels));
+			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, numChannels) };
+		}, update);
 	}
 
 
@@ -404,20 +414,15 @@ Steno {
 			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
 		});
 
-		// a dumm<
+		// currently, don't do anything. operator does the cleanup.
+		// need to make safe later.
+
 		this.addSynthDef('{', { |in, out|
 			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
 		});
 
-		// almost the same as ']', just sends more channels
-		this.addSynthDef('}', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var n = numChannels * maxArity;
-			var input = In.ar(in, n);  // in: bus outside parenthesis
-			var oldSignal = In.ar(out, n);
-			var inputOutside = In.ar(dryIn, n);  // dryIn: bus outside parenthesis
-			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
-			XOut.ar(out, EnvGate.new, output);
-			ReplaceOut.ar(in, Silent.ar(n)); // clean up bus: overwrite channels with zero, so it can be reused further down
+		this.addSynthDef('}', { |in, out|
+			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
 		});
 
 		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }); // if not found use this.
@@ -641,6 +646,9 @@ Steno {
 
 				// set args for subsequent synths
 				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
+
+				// argumentIndex is reset by the pop operation
+
 				//bracketStack.pop;
 
 				// args for this synth
