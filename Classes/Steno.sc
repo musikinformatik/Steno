@@ -327,10 +327,14 @@ Steno {
 	operator { |name, func, arity = 2, multiChannelExpand, update = true|
 		var numChannels = this.numChannels;
 		var totalNumChannels = numChannels * arity;
-		if(arity > maxArity) { Error("this operator has too many arguments. Increase maxArity if you need more").throw };
+		if(arity > maxArity) {
+			"this operator has too many arguments. Increase maxArity if you need more".warn;
+			arity = maxArity;
+		};
 		"Building operator '%' with an arity of %\n".postf(name, arity);
 
 		this.addSynthDef(name, { |in, out|
+			// once offset for }, once for first in
 			var stenoSignal = StenoSignal(in + (2 * numChannels), out, totalNumChannels);
 			var inputs = { |i|
 				stenoSignal.filterInput(numChannels, i * numChannels);
@@ -338,7 +342,10 @@ Steno {
 			var outputs = func.value(*inputs.keep(arity)).keep(numChannels); // todo pass controls?
 			stenoSignal.filterOutput(outputs, numChannels);
 			stenoSignal.writeToBus;
-			ReplaceOut.ar(in + numChannels, Silent.ar(arity - 1 * numChannels));
+			ReplaceOut.ar(
+				in + numChannels, // let through n channels
+				Silent.ar(arity - 1 * numChannels) // block the rest
+			);
 			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, numChannels) };
 		}, update);
 	}
