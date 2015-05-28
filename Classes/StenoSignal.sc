@@ -107,11 +107,13 @@ StenoSignal {
 	}
 
 	valueUGenFunc { |func, inputSignal, multiChannelExpand, argNumChannels|
-		var output = func.value(inputSignal, this).asArray;
 		var size = output.size;
+		var controls = (index: \synthIndex.kr, depth: \nestingDepth.kr, mix: \mix.kr, gate: \gate.kr, numChannels: \numChannels.kr, through: \through.kr, env: \env.kr);
+		var output = func.value(inputSignal, controls).asArray;
+
 
 		if(multiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
-			output = ({ func.value(inputSignal, this) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
+			output = ({ func.value(inputSignal, controls) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
 		};
 		if(output.isNil) { output = [0.0] };
 		output = output.collect { |x| if(x.rate !== \audio) { K2A.ar(x) } { x } };  // convert output rate if necessary
