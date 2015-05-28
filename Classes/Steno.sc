@@ -7,7 +7,7 @@ Steno {
 
 	var <numChannels, <expand, <maxBracketDepth, <server, <bus;
 	var <>quant, <settings, <globalSettings;
-	var <encyclopedia, <maxArity = 1;
+	var <encyclopedia, <operators, <maxArity = 1;
 	var <monitor, <diff;
 	var <busses, <synthList, <argList, <variables;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
@@ -36,6 +36,7 @@ Steno {
 		settings = ();
 		globalSettings = ();
 		variables = ();
+		operators = ();
 		this.initDiff;
 		this.initSynthDefs;
 		this.rebuildSynthDefs;
@@ -207,13 +208,12 @@ Steno {
 	}
 
 	initBusses {
-		var n = numChannels * maxArity;
-		if(busses.isNil or: { busses.first.numChannels != n }) {
+		if(busses.isNil or: { busses.first.numChannels != numChannels }) {
 			busses = {
-				var bus = Bus.audio(Server.default, n);
+				var bus = Bus.audio(Server.default, numChannels);
 				if(bus.isNil) { "not enough busses available!".warn };
 				bus
-			} ! maxBracketDepth
+			} ! (maxBracketDepth * maxArity)
 		};
 	}
 	//////////////////// getting information about the resulting synth graph ////////////
@@ -297,7 +297,7 @@ Steno {
 			var stenoSignal = StenoSignal(in, out, numChannels);
 			stenoSignal.filter(func, multiChannelExpand ? expand, numChannels);
 			stenoSignal.writeToBus;
-			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, numChannels) };
+			if(verbosity > 0) { ("new filter: \"%\" with % channels\n").postf(name, numChannels) };
 		}, update);
 	}
 
@@ -308,7 +308,7 @@ Steno {
 			var stenoSignal = StenoSignal(in, out, numChannels);
 			stenoSignal.quelle(func, multiChannelExpand ? expand, numChannels);
 			stenoSignal.writeToBus;
-			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, numChannels) };
+			if(verbosity > 0) { ("new quelle: \"%\" with % channels\n").postf(name, numChannels) };
 		}, update);
 	}
 
@@ -320,7 +320,7 @@ Steno {
 			var stenoSignal = StenoSignal(in, out, numChannels, multiChannelExpand);
 			func.value(stenoSignal.input, stenoSignal);
 			stenoSignal.writeToBus;
-			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, numChannels) };
+			if(verbosity > 0) { ("new struktur: \"%\" with % channels\n").postf(name, numChannels) };
 		}, update);
 	}
 
@@ -331,23 +331,24 @@ Steno {
 			"this operator has too many arguments. Increase maxArity if you need more".warn;
 			arity = maxArity;
 		};
-		"Building operator '%' with an arity of %\n".postf(name, arity);
 
 		this.addSynthDef(name, { |in, out|
 			// once offset for }, once for first in
-			var stenoSignal = StenoSignal(in + (2 * numChannels), out, totalNumChannels);
+			//var stenoSignal = StenoSignal(in + (2 * numChannels), out, totalNumChannels);
+			var stenoSignal = StenoSignal(in, out, totalNumChannels);
+
 			var inputs = { |i|
 				stenoSignal.filterInput(numChannels, i * numChannels);
 			} ! arity;
 			var outputs = func.value(*inputs.keep(arity)).keep(numChannels); // todo pass controls?
 			stenoSignal.filterOutput(outputs, numChannels);
 			stenoSignal.writeToBus;
-			ReplaceOut.ar(
-				in + numChannels, // let through n channels
-				Silent.ar(arity - 1 * numChannels) // block the rest
-			);
-			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, numChannels) };
+			//ReplaceOut.ar(in, Silent.ar(numChannels)); // block the rest
+
+			if(verbosity > 0) { ("new operator: \"%\" with % channels and arity %\n").postf(name, numChannels, arity) };
 		}, update);
+
+		operators[name.asSymbol] = arity;
 	}
 
 
@@ -564,12 +565,13 @@ Steno {
 		bracketStack = [];
 		tokenIndices = ();
 		this.initBusses;
-
 	}
 
 	calcNextArguments { |token, i|
 		var previousWriteIndex, args, thisSetting;
 		token = token.asSymbol;
+
+
 		switch(token,
 			'(', {
 				// save current args on stack
@@ -627,11 +629,12 @@ Steno {
 
 
 			},
-			// same as '[' just don't go one deeper in bracket depth (arguable + experimental)
+			// same as '[', but add argument index = 0
 			'{', {
-				// save current args on stack
+
+			// save current args on stack
 				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
-				//bracketStack = bracketStack.add(token);
+				bracketStack = bracketStack.add(token);
 
 				// args for this synth
 				args = []; // nothing needed (dummy synth)
@@ -648,34 +651,40 @@ Steno {
 			},
 			// same as ']' just no bracket stack pop (arguable + experimental)
 			'}', {
-				// save current write index
-				previousWriteIndex = writeIndex;
-
-				// set args for subsequent synths
-				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
-
-				// argumentIndex is reset by the pop operation
-
-				//bracketStack.pop;
-
-				// args for this synth
-				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
+				// nothing ...
 
 			},
 			// default case
 			{
+				if(operators[token].notNil) {
+					// same as ']' just no bracket stack pop (arguable + experimental)
+					// save current write index
+					previousWriteIndex = writeIndex;
+
+					// set args for subsequent synths
+					#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
+					//bracketStack.pop;
+
+					// args for this synth
+					// TODO: argumentIndex can be checked here to account for arity
+					[\operator, \previousWriteIndex, previousWriteIndex, \writeIndex, writeIndex].postln;
+					args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
+
+				};
 
 				if(tokenIndices[token].isNil) { tokenIndices[token] = 0 };
 
-				// args for this synth
+				// generate the arguments for this synth
 				args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
 				++ [\synthIndex, effectiveSynthIndex, \nestingDepth, bracketStack.size, \tokenIndex, tokenIndices[token]];
 
+				// if we are in an operator, count up, next token will represent the next argument
+				if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 % maxArity };
+
+				// generate some extra information that is passed as arguments to the next synth
 				effectiveSynthIndex = effectiveSynthIndex + 1; // only count up for normal synths, not for brackets
 				tokenIndices[token] = tokenIndices[token] + 1;
-				if(argumentIndex.notNil) {
-					argumentIndex = argumentIndex + 1 % maxArity
-				};
+
 			}
 		);
 		//"% args: %\n".postf(token, args);
@@ -692,7 +701,8 @@ Steno {
 		var readBus = busses.clipAt(readIndex).index;
 		var writeBus = busses.clipAt(writeIndex).index;
 		var dryReadBus = busses.clipAt(dryReadIndex).index;
-		^[\in, readBus, \out, writeBus + (argumentIndex * numChannels), \dryIn, dryReadBus, \through, through]
+		writeBus = writeBus + (argumentIndex * numChannels);
+		^[\in, readBus, \out, writeBus, \dryIn, dryReadBus, \through, through]
 	}
 
 
