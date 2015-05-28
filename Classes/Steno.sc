@@ -656,6 +656,7 @@ Steno {
 			},
 			// default case
 			{
+
 				if(operators[token].notNil) {
 					// same as ']' just no bracket stack pop (arguable + experimental)
 					// save current write index

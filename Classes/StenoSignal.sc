@@ -66,8 +66,9 @@ StenoSignal {
 
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
+
 		localInput = input.asArray.drop(offset).keep(argNumChannels);
-		signal = signal * (mix * env) + localInput;  // can't use Out here, because in can be different than out
+		signal = signal * (mix * env) + localInput;  // can't use Out here, because "in" can be different than "out"
 		this.addOutput(signal, offset);
 	}
 
@@ -75,14 +76,14 @@ StenoSignal {
 	filter { |func, multiChannelExpand, argNumChannels|
 		var inputSignal = this.filterInput;
 		var signal = this.valueUGenFunc(func, inputSignal, multiChannelExpand, argNumChannels);
-		this.filterOutput(signal);
+		this.filterOutput(signal, signal.size);
 	}
 
 	// unique quelle definition
 	quelle { |func, multiChannelExpand, argNumChannels|
 		var inputSignal = this.quelleInput;
 		var signal = this.valueUGenFunc(func, inputSignal, multiChannelExpand, argNumChannels);
-		this.filterOutput(signal);
+		this.quelleOutput(signal, signal.size);
 	}
 
 	addOutput { |signal, offset = 0|
