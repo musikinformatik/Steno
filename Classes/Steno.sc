@@ -338,7 +338,7 @@ Steno {
 			var inputs = { |i|
 				stenoSignal.filterInput(numChannels, i * numChannels);
 			} ! arity;
-			var outputs = func.value(*inputs.keep(arity)).asArray.keep(numChannels); // todo pass controls? happens in StenoSignal
+			var outputs = func.value(*inputs.keep(arity)).asArray.keep(numChannels); // todo pass controls.
 
 			stenoSignal.filterOutput(outputs, numChannels);
 			stenoSignal.writeToBus;
@@ -568,7 +568,7 @@ Steno {
 	}
 
 	calcNextArguments { |token, i|
-		var previousWriteIndex, args, thisSetting;
+		var previousWriteIndex, args, thisSetting, arity;
 		token = token.asSymbol;
 
 
@@ -651,30 +651,28 @@ Steno {
 			},
 			// same as ']' just no bracket stack pop (arguable + experimental)
 			'}', {
-				// nothing ...
+				// similar to ']' just no bracket stack pop
+				// save current write index
+				previousWriteIndex = writeIndex;
 
+				// set args for subsequent synths
+				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
+
+				// args for this synth.
+				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 			},
 			// default case
 			{
 
-				if(operators[token].notNil) {
-					// same as ']' just no bracket stack pop (arguable + experimental)
+				if(arity = operators[token].notNil) {
 					// save current write index
-					previousWriteIndex = writeIndex;
-
-					// set args for subsequent synths
-					#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
-					//bracketStack.pop;
-
-					// args for this synth
-					// TODO: argumentIndex can be checked here to account for arity
-					[\operator, \previousWriteIndex, previousWriteIndex, \writeIndex, writeIndex].postln;
-					args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
+					readIndex = writeIndex = writeIndex - arity; // how to limit to the right level?
+					// args for this synth.
+					args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
 				} {
 					// generate the arguments for this synth
 					args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
-
 				};
 
 				// add extra information
