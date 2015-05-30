@@ -1,16 +1,18 @@
 
 StenoSignal {
-	var <inBus, <outBus, <numChannels, <multiChannelExpand;
-	var <env, <gate, <fadeTime, <mix, <through, <dryIn;
-	var <synthIndex, <depth, <input;
+	var <numChannels, <multiChannelExpand;
+	var <inBus, <outBus, <env, <gate, <fadeTime, <mix, <through, <dryIn;
+	var <synthIndex, <depth, <input, <controls;
 	var outputSignals;
 
-	*new { |inBus, outBus, numChannels, multiChannelExpand = false|
+	*new { |numChannels, multiChannelExpand = false|
 		if(UGen.buildSynthDef.isNil) { "steno signal only works inside a ugen graph".warn };
-		^super.newCopyArgs(inBus, outBus, numChannels, multiChannelExpand).init
+		^super.newCopyArgs(numChannels, multiChannelExpand).init
 	}
 
 	init {
+		inBus = \in.kr(0);
+		outBus = \out.kr(0);
 		gate = \gate.kr(1);
 		fadeTime = \fadeTime.kr(0.02);
 		env = EnvGen.kr(Env.asr(0, 1, fadeTime), gate);
@@ -21,6 +23,15 @@ StenoSignal {
 		depth = \nestingDepth.kr(0);
 		input = In.ar(inBus, numChannels).asArray;
 		outputSignals = Array.fill(numChannels, 0.0);
+		controls = (
+			index: synthIndex,
+			depth: depth,
+			mix: mix,
+			gate: gate,
+			numChannels: numChannels,
+			through: through,
+			env: env
+		);
 	}
 
 	// get filter input
@@ -93,9 +104,9 @@ StenoSignal {
 			"too many signals added, ignoring them:".warn;
 			outputSignals.postcs;
 		};
-		signal.do { |channel, i|
+		signal.do { |x, i|
 			i = i + offset;
-			outputSignals[i] = outputSignals[i] + channel;
+			outputSignals[i] = outputSignals[i] + x;
 		}
 	}
 
@@ -107,10 +118,9 @@ StenoSignal {
 	}
 
 	valueUGenFunc { |func, inputSignal, multiChannelExpand, argNumChannels|
-		var size = output.size;
-		var controls = (index: \synthIndex.kr, depth: \nestingDepth.kr, mix: \mix.kr, gate: \gate.kr, numChannels: \numChannels.kr, through: \through.kr, env: \env.kr);
-		var output = func.value(inputSignal, controls).asArray;
 
+		var output = func.value(inputSignal, controls).asArray;
+		var size = output.size;
 
 		if(multiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
 			output = ({ func.value(inputSignal, controls) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
@@ -118,7 +128,9 @@ StenoSignal {
 		if(output.isNil) { output = [0.0] };
 		output = output.collect { |x| if(x.rate !== \audio) { K2A.ar(x) } { x } };  // convert output rate if necessary
 		if(output.size > argNumChannels) {
-			output = SplayAz.ar(argNumChannels, output);  // definitely limit number of channels. // here we could also just keep n channels instead?
+			// definitely limit number of channels.
+			// here we could also just keep n channels instead?
+			output = SplayAz.ar(argNumChannels, output);
 			"Mapped synth def function channels from % to % channels\n".postf(size, argNumChannels);
 		};
 		^output

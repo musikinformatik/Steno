@@ -293,8 +293,8 @@ Steno {
 
 	filter { |name, func, multiChannelExpand, update = true, numChannels|
 		numChannels = min(numChannels ? this.numChannels, this.numChannels);
-		this.addSynthDef(name, { |in, out|
-			var stenoSignal = StenoSignal(in, out, numChannels);
+		this.addSynthDef(name, {
+			var stenoSignal = StenoSignal(numChannels);
 			stenoSignal.filter(func, multiChannelExpand ? expand, numChannels);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new filter: \"%\" with % channels\n").postf(name, numChannels) };
@@ -304,8 +304,8 @@ Steno {
 	quelle { |name, func, multiChannelExpand, update = true, numChannels|
 
 		numChannels = min(numChannels ? this.numChannels, this.numChannels);
-		this.addSynthDef(name, { |in, out|
-			var stenoSignal = StenoSignal(in, out, numChannels);
+		this.addSynthDef(name, {
+			var stenoSignal = StenoSignal(numChannels);
 			stenoSignal.quelle(func, multiChannelExpand ? expand, numChannels);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new quelle: \"%\" with % channels\n").postf(name, numChannels) };
@@ -316,8 +316,8 @@ Steno {
 	struktur { |name, func, multiChannelExpand, update = true, numChannels|
 
 		numChannels = min(numChannels ? this.numChannels, this.numChannels);
-		this.addSynthDef(name, { |in, out|
-			var stenoSignal = StenoSignal(in, out, numChannels, multiChannelExpand);
+		this.addSynthDef(name, {
+			var stenoSignal = StenoSignal(numChannels, multiChannelExpand);
 			func.value(stenoSignal.input, stenoSignal);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new struktur: \"%\" with % channels\n").postf(name, numChannels) };
@@ -332,15 +332,15 @@ Steno {
 			arity = maxArity;
 		};
 
-		this.addSynthDef(name, { |in, out|
+		this.addSynthDef(name, {
 			// once offset for }, once for first in
 			//var stenoSignal = StenoSignal(in + (2 * numChannels), out, totalNumChannels);
-			var stenoSignal = StenoSignal(in, out, totalNumChannels);
+			var stenoSignal = StenoSignal(totalNumChannels);
 
 			var inputs = { |i|
 				stenoSignal.filterInput(numChannels, i * numChannels);
 			} ! arity;
-			var outputs = func.value(*inputs.keep(arity)).keep(numChannels); // todo pass controls?
+			var outputs = func.value(*inputs.keep(arity)).keep(numChannels); // todo pass controls? happens in StenoSignal
 			stenoSignal.filterOutput(outputs, numChannels);
 			stenoSignal.writeToBus;
 			//ReplaceOut.ar(in, Silent.ar(numChannels)); // block the rest
