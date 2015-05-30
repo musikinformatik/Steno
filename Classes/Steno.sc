@@ -328,21 +328,21 @@ Steno {
 		var numChannels = this.numChannels;
 		var totalNumChannels = numChannels * arity;
 		if(arity > maxArity) {
-			"this operator has too many arguments. Increase maxArity if you need more".warn;
+			"this operator has too many arguments. Increase maxArity (from % to at least %) if you need more"
+			.format(maxArity, arity).warn;
 			arity = maxArity;
 		};
 
 		this.addSynthDef(name, {
-			// once offset for }, once for first in
-			//var stenoSignal = StenoSignal(in + (2 * numChannels), out, totalNumChannels);
 			var stenoSignal = StenoSignal(totalNumChannels);
-
 			var inputs = { |i|
 				stenoSignal.filterInput(numChannels, i * numChannels);
 			} ! arity;
-			var outputs = func.value(*inputs.keep(arity)).keep(numChannels); // todo pass controls? happens in StenoSignal
+			var outputs = func.value(*inputs.keep(arity)).asArray.keep(numChannels); // todo pass controls? happens in StenoSignal
+
 			stenoSignal.filterOutput(outputs, numChannels);
 			stenoSignal.writeToBus;
+
 			//ReplaceOut.ar(in, Silent.ar(numChannels)); // block the rest
 
 			if(verbosity > 0) { ("new operator: \"%\" with % channels and arity %\n").postf(name, numChannels, arity) };
@@ -671,13 +671,16 @@ Steno {
 					[\operator, \previousWriteIndex, previousWriteIndex, \writeIndex, writeIndex].postln;
 					args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
+				} {
+					// generate the arguments for this synth
+					args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
+
 				};
 
+				// add extra information
 				if(tokenIndices[token].isNil) { tokenIndices[token] = 0 };
-
-				// generate the arguments for this synth
-				args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
-				++ [\synthIndex, effectiveSynthIndex, \nestingDepth, bracketStack.size, \tokenIndex, tokenIndices[token]];
+				args = args ++ [\synthIndex, effectiveSynthIndex, \nestingDepth, bracketStack.size,
+					\tokenIndex, tokenIndices[token]];
 
 				// if we are in an operator, count up, next token will represent the next argument
 				if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 % maxArity };
