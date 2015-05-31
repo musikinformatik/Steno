@@ -394,10 +394,11 @@ Steno {
 			var oldSignal = In.ar(out, numChannels);
 			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
 			var output = XFade2.ar(inputOutside, drySignal + (through * oldSignal), mix * 2 - 1);
-			XOut.ar(out, EnvGate.new, output)
+			XOut.ar(out, EnvGate.new, output); // overwrite the out channel with the new mix
 		});
 
 		this.addSynthDef('[', { |in, out|
+			ReplaceOut.ar(out, Silent.ar(numChannels)); // umbrella
 			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
 		});
 
@@ -570,6 +571,8 @@ Steno {
 				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
 				bracketStack = bracketStack.add(token);
 
+				argumentIndex = nil;
+
 				// args for this synth
 				args = this.getBusArgs(readIndex, writeIndex + 1, readIndex, through, argumentIndex);
 
@@ -577,6 +580,7 @@ Steno {
 				dryReadIndex = readIndex;
 				readIndex = writeIndex = writeIndex + 1;
 				through = 0.0;
+
 
 			},
 			')', {
@@ -588,8 +592,11 @@ Steno {
 				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
 				bracketStack.pop;
 
+
 				// args for this synth
 				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
+				// if we are in an operator, count up, because result will be one of the operands
+				if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
 
 			},
 
@@ -597,6 +604,8 @@ Steno {
 				// save current args on stack
 				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
 				bracketStack = bracketStack.add(token);
+
+				argumentIndex = nil;
 
 				// args for this synth
 				args = []; // nothing needed (dummy synth)
@@ -607,6 +616,7 @@ Steno {
 				writeIndex = writeIndex + 1;
 				through = 1.0;
 
+
 			},
 			']', {
 				// save current write index
@@ -616,8 +626,12 @@ Steno {
 				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
 				bracketStack.pop;
 
+
 				// args for this synth
 				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
+
+				// if we are in an operator, count up, because result will be one of the operands
+				if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
 
 
 			},
@@ -656,11 +670,17 @@ Steno {
 			{
 				arity = operators[token];
 
+				// escape operators that occur outside a stack context
+				if(arity.notNil and: { argumentIndex.isNil }) {
+					"Operator '%' used outside a stack. Better we ignore it.".format(token).warn;
+					token = '?';
+				};
 				// generate the arguments for this synth
 
 				// operator
 				if(arity.notNil) {
-					argumentIndex = argumentIndex - arity;
+
+					argumentIndex = max(0, argumentIndex - arity);
 					// args for this synth: in this case: read from the last argument index.
 					args = this.getBusArgs(writeIndex + argumentIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
@@ -684,6 +704,7 @@ Steno {
 
 			}
 		);
+		"after %,  the argument index is %\n".postf(token, argumentIndex);
 		//"% args: %\n".postf(token, args);
 
 		thisSetting = globalSettings.copy ? ();
