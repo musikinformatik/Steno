@@ -726,10 +726,20 @@ Steno {
 
 	// generate synth arguments for in-out-mapping
 
+	getBusIndex { |index|
+		if(index > busses.size) {
+			"graph structure too deep, increase maxBracketDepth".warn;
+			^busses.last.index
+		} {
+			busses[index].index
+		}
+
+	}
+
 	getBusArgs { |readIndex, writeIndex, dryReadIndex, through, argumentIndex = (0)|
-		var readBus = busses.clipAt(readIndex).index;
-		var writeBus = busses.clipAt(writeIndex).index;
-		var dryReadBus = busses.clipAt(dryReadIndex).index;
+		var readBus = this.getBusIndex(readIndex);
+		var writeBus = this.getBusIndex(writeIndex);
+		var dryReadBus = this.getBusIndex(dryReadIndex);
 		var argumentOffset = argumentIndex * numChannels;
 		writeBus = writeBus + argumentOffset;
 		^[\in, readBus, \out, writeBus, \dryIn, dryReadBus, \through, through]
