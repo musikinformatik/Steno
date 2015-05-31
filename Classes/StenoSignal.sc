@@ -112,7 +112,7 @@ StenoSignal {
 
 	writeToBus {
 		outputSignals !? {
-			outputSignals.keep(numChannels).postcs;
+			outputSignals.keep(numChannels);
 			ReplaceOut.ar(outBus, outputSignals.keep(numChannels))
 		}
 	}

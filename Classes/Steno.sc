@@ -659,7 +659,7 @@ Steno {
 				dryReadIndex = readIndex;
 				readIndex = readIndex; // same same
 				writeIndex = writeIndex + 1;
-				through = 1.0;
+				through = 0.0;
 
 				// nary operators
 				argumentIndex = 0;
@@ -715,7 +715,7 @@ Steno {
 
 			}
 		);
-		"after %,  the argument index is %\n".postf(token, argumentIndex);
+		//"after %,  the argument index is %\n".postf(token, argumentIndex);
 		//"% args: %\n".postf(token, args);
 
 		thisSetting = globalSettings.copy ? ();
