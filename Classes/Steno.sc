@@ -727,9 +727,9 @@ Steno {
 	// generate synth arguments for in-out-mapping
 
 	getBusIndex { |index|
-		if(index > busses.size) {
+		^if(index > busses.size) {
 			"graph structure too deep, increase maxBracketDepth".warn;
-			^busses.last.index
+			busses.last.index
 		} {
 			busses[index].index
 		}
