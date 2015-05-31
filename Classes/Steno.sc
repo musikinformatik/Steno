@@ -322,6 +322,9 @@ Steno {
 	operator { |name, func, arity = 2, multiChannelExpand, update = true|
 		var numChannels = this.numChannels;
 		var totalNumChannels = numChannels * arity;
+		var updateSubgraph;
+
+		updateSubgraph = this.prevTokens.includes(name) and: { operators[name] != arity };
 
 		this.addSynthDef(name, {
 			var stenoSignal = StenoSignal(totalNumChannels);
@@ -334,7 +337,7 @@ Steno {
 			stenoSignal.writeToBus;
 
 			if(verbosity > 0) { ("new operator: \"%\" with % channels and arity %\n").postf(name, numChannels, arity) };
-		}, update);
+		}, update, updateSubgraph);
 
 		operators[name.asSymbol] = arity;
 	}
@@ -431,14 +434,21 @@ Steno {
 	}
 
 
-	addSynthDef { |name, func, update = true|
+	addSynthDef { |name, func, update = true, updateSubgraph = false|
 		if(variables.at(name).notNil) { Error("The token '%' is declared as a variable already.".format(name)).throw };
 		encyclopedia = encyclopedia ? ();
 		encyclopedia.put(name, func);
 		SynthDef(this.prefix(name), func).add;
 		if(update) {
-			fork { server.sync; this.resendSynths([name]) }
-		};
+			fork {
+				server.sync;
+				if(updateSubgraph) {
+					this.resendSynths // for now, just update all
+				} {
+					this.resendSynths([name])
+				}
+			}
+		}
 	}
 
 
@@ -638,7 +648,7 @@ Steno {
 			// same as '[', but add argument index = 0
 			'{', {
 
-			// save current args on stack
+				// save current args on stack
 				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
 				bracketStack = bracketStack.add(token);
 
@@ -674,33 +684,34 @@ Steno {
 				if(arity.notNil and: { argumentIndex.isNil }) {
 					"Operator '%' used outside a stack. Better we ignore it.".format(token).warn;
 					token = '?';
-				};
-				// generate the arguments for this synth
-
-				// operator
-				if(arity.notNil) {
-
-					argumentIndex = max(0, argumentIndex - arity);
-					// args for this synth: in this case: read from the last argument index.
-					args = this.getBusArgs(writeIndex + argumentIndex, writeIndex, dryReadIndex, through, argumentIndex);
-
 				} {
+					// generate the arguments for this synth
 
-					// non-operator
-					args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
-				};
+					// operator
+					if(arity.notNil) {
 
-				// add extra information
-				if(tokenIndices[token].isNil) { tokenIndices[token] = 0 };
-				args = args ++ [\synthIndex, effectiveSynthIndex, \nestingDepth, bracketStack.size,
-					\tokenIndex, tokenIndices[token]];
+						argumentIndex = max(0, argumentIndex - arity);
+						// args for this synth: in this case: read from the last argument index.
+						args = this.getBusArgs(writeIndex + argumentIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
-				// if we are in an operator, count up, next token will represent the next argument
-				if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
+					} {
 
-				// generate some extra information that is passed as arguments to the next synth
-				effectiveSynthIndex = effectiveSynthIndex + 1; // only count up for normal synths, not for brackets
-				tokenIndices[token] = tokenIndices[token] + 1;
+						// non-operator
+						args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
+					};
+
+					// add extra information
+					if(tokenIndices[token].isNil) { tokenIndices[token] = 0 };
+					args = args ++ [\synthIndex, effectiveSynthIndex, \nestingDepth, bracketStack.size,
+						\tokenIndex, tokenIndices[token]];
+
+					// if we are in an operator, count up, next token will represent the next argument
+					if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
+
+					// generate some extra information that is passed as arguments to the next synth
+					effectiveSynthIndex = effectiveSynthIndex + 1; // only count up for normal synths, not for brackets
+					tokenIndices[token] = tokenIndices[token] + 1;
+				}
 
 			}
 		);
