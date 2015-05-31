@@ -410,15 +410,19 @@ Steno {
 			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
 		});
 
-		// currently, don't do anything. operator does the cleanup.
-		// need to make safe later.
 
 		this.addSynthDef('{', { |in, out|
 			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
 		});
 
-		this.addSynthDef('}', { |in, out|
-			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
+		// same as ]
+		this.addSynthDef('}', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
+			var input = In.ar(in, numChannels);  // in: bus outside parenthesis
+			var oldSignal = In.ar(out, numChannels);
+			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
+			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
+			XOut.ar(out, EnvGate.new, output);
+			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
 		});
 
 		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }); // if not found use this.
@@ -637,30 +641,32 @@ Steno {
 				argumentIndex = 0;
 
 			},
-			// same as ']' just no bracket stack pop (arguable + experimental)
+
 			'}', {
-				// similar to ']' just no bracket stack pop
-				// save current write index
-				previousWriteIndex = writeIndex;
+
+				previousWriteIndex = writeIndex + argumentIndex - 1; // sure?
 
 				// set args for subsequent synths
 				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
 
 				// args for this synth.
-				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, 0);
+				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 			},
 			// default case
 			{
+				arity = operators[token];
 
-				if(arity = operators[token].notNil) {
-					previousArgumentIndex = argumentIndex;
-					argumentIndex = 0; //max(argumentIndex ? 0 - arity, 0);
-					// args for this synth.
+				// generate the arguments for this synth
+
+				// operator
+				if(arity.notNil) {
+					argumentIndex = argumentIndex - arity;
+					// args for this synth: in this case: read from the last argument index.
 					args = this.getBusArgs(writeIndex + argumentIndex, writeIndex, dryReadIndex, through, argumentIndex);
-					argumentIndex = previousArgumentIndex;
 
 				} {
-					// generate the arguments for this synth
+
+					// non-operator
 					args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
 				};
 
