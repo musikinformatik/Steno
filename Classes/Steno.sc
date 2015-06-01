@@ -378,7 +378,7 @@ Steno {
 					0.1
 				)
 			)
-		});
+		}, force:true);
 
 		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
 			var feedbackIn = InFeedback.ar(in, numChannels); // out: bus inside parenthesis
@@ -389,7 +389,7 @@ Steno {
 			XOut.ar(out, EnvGate.new, output);
 			// here is a problem, actually we can't reuse a bus that is used for feedback (unless: we want to mix in several feedbacks).
 			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
-		});
+		}, force:true);
 
 		this.addSynthDef(')', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
 			var drySignal = In.ar(in, numChannels); // out: bus inside parenthesis
@@ -397,12 +397,12 @@ Steno {
 			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
 			var output = XFade2.ar(inputOutside, drySignal + (through * oldSignal), mix * 2 - 1);
 			XOut.ar(out, EnvGate.new, output); // overwrite the out channel with the new mix
-		});
+		}, force:true);
 
 		this.addSynthDef('[', { |in, out|
 			ReplaceOut.ar(out, Silent.ar(numChannels)); // umbrella
 			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
-		});
+		}, force:true);
 
 		this.addSynthDef(']', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
 			var input = In.ar(in, numChannels);  // in: bus outside parenthesis
@@ -411,12 +411,12 @@ Steno {
 			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
 			XOut.ar(out, EnvGate.new, output);
 			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
-		});
+		}, force:true);
 
 
 		this.addSynthDef('{', { |in, out|
 			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
-		});
+		}, force:true);
 
 		// same as ]
 		this.addSynthDef('}', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
@@ -426,15 +426,18 @@ Steno {
 			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
 			XOut.ar(out, EnvGate.new, output);
 			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
-		});
+		}, force:true);
 
-		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }); // if not found use this.
+		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }, force:true); // if not found use this.
 
 	}
 
 
-	addSynthDef { |name, func, update = true, updateSubgraph = false|
+	addSynthDef { |name, func, update = true, updateSubgraph = false, force = false|
 		if(variables.at(name).notNil) { Error("The token '%' is declared as a variable already.".format(name)).throw };
+		if("()[]{}?".find(name.asString).notNil  and: { force.not }) {
+			Error("The token '%' cannot be overridden.".format(name)).throw
+		};
 		encyclopedia = encyclopedia ? ();
 		encyclopedia.put(name, func);
 		SynthDef(this.prefix(name), func).add;
@@ -544,7 +547,6 @@ Steno {
 
 	newSynth { |token, i, args|
 		var target = synthList[i - 1];
-		var setting;
 		token = token.asSymbol;
 		if(encyclopedia.at(token).isNil) { token = '?' }; // silent
 
