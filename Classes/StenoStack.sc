@@ -151,10 +151,9 @@ StenoStack {
 	}
 
 	getBusArgs { |readIndex, writeIndex, dryReadIndex, through, argumentIndex|
-		var readBus, writeBus, dryReadBus, argumentOffset;
-		readBus = this.getBusIndex(readIndex);
-		writeBus = this.getBusIndex(writeIndex + (argumentOffset ? 0));
-		dryReadBus = this.getBusIndex(dryReadIndex);
+		var readBus = this.getBusIndex(readIndex);
+		var writeBus = this.getBusIndex(writeIndex + (argumentIndex ? 0));
+		var dryReadBus = this.getBusIndex(dryReadIndex);
 		^[\in, readBus, \out, writeBus, \dryIn, dryReadBus, \through, through]
 	}
 
