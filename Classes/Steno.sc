@@ -36,6 +36,7 @@ Steno {
 		globalSettings = ();
 		variables = ();
 		operators = ();
+		this.initBusses;
 		this.initDiff;
 		this.initSynthDefs;
 		this.rebuildSynthDefs;
@@ -211,14 +212,16 @@ Steno {
 				"not enough busses available! Please reboot server"
 				"or increase number of audio bus channels in ServerOptions".throw
 			};
-			busIndices = (busIndices, busIndices + numChannels .. n);
+
+			busIndices = busIndices + (0, numChannels .. n);
+			[\initBusses, busIndices].postln;
 		}
 	}
 	//////////////////// getting information about the resulting synth graph ////////////
 
 	dumpStructure { |postDryIn = false|
 		var header = String.fill(maxBracketDepth + 4, $-);
-		var findBus = { |bus| /*busIndices.indexOf(bus)*/ bus };
+		var findBus = { |bus| busIndices.indexOf(bus) };
 		header = [header, "  %  ", header, "\n"].join;
 		argList.do { |args, i|
 			var in, out, dryIn;
@@ -571,9 +574,10 @@ Steno {
 	}
 
 	calcNextArguments { |token, i|
-		var args, thisSetting, arity;
-		token = token.asSymbol;
+		var args, thisSetting, arity, controls;
 
+		token = token.asSymbol;
+		controls = argumentStack.controls;
 
 		args = switch(token,
 			'(', { argumentStack.beginSerial },
@@ -603,9 +607,15 @@ Steno {
 		"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
 		"% args: %\n".postf(token, args);
 
+
 		thisSetting = globalSettings.copy ? ();
 		settings.at(token) !? { thisSetting.putAll(settings.at(token)) };
-		^args ++ thisSetting.asKeyValuePairs
+
+		 // we allow functions in settings to expand dependent on current state
+		thisSetting.keysValuesDo { |key, val|
+			args = args.add(key).add(val.value(controls))
+		};
+		^args
 
 	}
 

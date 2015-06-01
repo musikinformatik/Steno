@@ -84,11 +84,10 @@ StenoStack {
 
 	}
 
-	// same as beginParallel, but argumentIndex = 0
 	beginStack {
 		var args = this.beginParallel;
 		// nary operators
-		argumentIndex = 0;
+		through = argumentIndex = 0;
 		^args
 	}
 
@@ -129,8 +128,12 @@ StenoStack {
 
 	}
 
-	controlArgs { |token|
-		^[\synthIndex, effectiveSynthIndex, \nestingDepth, nestingDepth, \tokenIndex, tokenIndices[token]]
+	controls {
+		^(
+			synthIndex: effectiveSynthIndex,
+			nestingDepth: nestingDepth,
+			tokenIndex: tokenIndex
+		)
 	}
 
 	// generate synth arguments for in-out-mapping
