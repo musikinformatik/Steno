@@ -13,8 +13,7 @@ Steno {
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
 
-	var dryReadIndex = 0, readIndex = 0, writeIndex = 0, through = 0, effectiveSynthIndex = 0, argumentIndex;
-	var bracketStack, argStack, tokenIndices;
+	var argumentStack;
 
 	classvar <>current;
 
@@ -521,7 +520,7 @@ Steno {
 			},
 			returnFunc: {
 				if(verbosity > 1) { this.dumpStructure };
-				this.initArguments; // just to make sure: sometimes it seems that beginFunc isn't called.
+				argumentStack = nil;
 			}
 		)
 	}
@@ -562,187 +561,47 @@ Steno {
 	////////////////////////////////////////////////////////
 
 	initArguments {
-		readIndex = writeIndex = dryReadIndex = through = effectiveSynthIndex = 0;
-		argumentIndex = nil; // for nary-op functions
-		argStack = [];
-		bracketStack = [];
-		tokenIndices = ();
-		this.initBusses;
+		argumentStack = StenoStack(busses);
 	}
 
 	calcNextArguments { |token, i|
-		var previousWriteIndex, previousArgumentIndex, args, thisSetting, arity;
+		var args, thisSetting, arity;
 		token = token.asSymbol;
 
 
-		switch(token,
-			'(', {
-				// save current args on stack
-				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
-				bracketStack = bracketStack.add(token);
+		args = switch(token,
+			'(', { argumentStack.beginSerial },
+			')', { argumentStack.endSerial },
 
-				argumentIndex = nil;
-
-				// args for this synth
-				args = this.getBusArgs(readIndex, writeIndex + 1, readIndex, through, argumentIndex);
-
-				// set args for subsequent synths
-				dryReadIndex = readIndex;
-				readIndex = writeIndex = writeIndex + 1;
-				through = 0.0;
-
-
-			},
-			')', {
-
-				// save current write index
-				previousWriteIndex = writeIndex;
-
-				// set args for subsequent synths
-				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
-				bracketStack.pop;
-
-
-				// args for this synth
-				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
-				// if we are in an operator, count up, because result will be one of the operands
-				if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
-
-			},
-
-			'[', {
-				// save current args on stack
-				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
-				bracketStack = bracketStack.add(token);
-
-				argumentIndex = nil;
-
-				// args for this synth
-				args = []; // nothing needed (dummy synth)
-
-				// set args for subsequent synths
-				dryReadIndex = readIndex;
-				readIndex = readIndex; // same same
-				writeIndex = writeIndex + 1;
-				through = 1.0;
-
-
-			},
-			']', {
-				// save current write index
-				previousWriteIndex = writeIndex;
-
-				// set args for subsequent synths
-				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
-				bracketStack.pop;
-
-
-				// args for this synth
-				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
-
-				// if we are in an operator, count up, because result will be one of the operands
-				if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
-
-
-			},
-			// same as '[', but add argument index = 0
-			'{', {
-
-				// save current args on stack
-				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
-				bracketStack = bracketStack.add(token);
-
-				// args for this synth
-				args = []; // nothing needed (dummy synth)
-
-				// set args for subsequent synths
-				dryReadIndex = readIndex;
-				readIndex = readIndex; // same same
-				writeIndex = writeIndex + 1;
-				through = 0.0;
-
-				// nary operators
-				argumentIndex = 0;
-
-			},
-
-			'}', {
-
-				previousWriteIndex = writeIndex + argumentIndex - 1; // sure?
-
-				// set args for subsequent synths
-				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
-
-				// args for this synth.
-				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
-			},
+			'[', { argumentStack.beginParallel },
+			']', { argumentStack.endParallel },
+			'{', { argumentStack.beginStack },
+			'}', { argumentStack.endStack },
 			// default case
 			{
 				arity = operators[token];
 
 				// escape operators that occur outside a stack context
-				if(arity.notNil and: { argumentIndex.isNil }) {
+				if(arity.notNil and: { argumentStack.inOperatorStack.not }) {
 					"Operator '%' used outside a stack. Better we ignore it.".format(token).warn;
 					token = '?';
+					argumentStack.pushLetter(token)
 				} {
-					// generate the arguments for this synth
-
-					// operator
 					if(arity.notNil) {
-
-						argumentIndex = max(0, argumentIndex - arity);
-						// args for this synth: in this case: read from the last argument index.
-						args = this.getBusArgs(writeIndex + argumentIndex, writeIndex, dryReadIndex, through, argumentIndex);
-
+						argumentStack.pushOperator(arity)
 					} {
-
-						// non-operator
-						args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
-					};
-
-					// add extra information
-					if(tokenIndices[token].isNil) { tokenIndices[token] = 0 };
-					args = args ++ [\synthIndex, effectiveSynthIndex, \nestingDepth, bracketStack.size,
-						\tokenIndex, tokenIndices[token]];
-
-					// if we are in an operator, count up, next token will represent the next argument
-					if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
-
-					// generate some extra information that is passed as arguments to the next synth
-					effectiveSynthIndex = effectiveSynthIndex + 1; // only count up for normal synths, not for brackets
-					tokenIndices[token] = tokenIndices[token] + 1;
+						argumentStack.pushLetter(token)
+					}
 				}
-
 			}
 		);
-		//"after %,  the argument index is %\n".postf(token, argumentIndex);
-		//"% args: %\n".postf(token, args);
+		"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
+		"% args: %\n".postf(token, args);
 
 		thisSetting = globalSettings.copy ? ();
 		settings.at(token) !? { thisSetting.putAll(settings.at(token)) };
 		^args ++ thisSetting.asKeyValuePairs
 
-	}
-
-	// generate synth arguments for in-out-mapping
-
-	getBusIndex { |index|
-		^if(index > busses.size) {
-			"graph structure too deep, increase maxBracketDepth".warn;
-			busses.last.index
-		} {
-			busses[index].index
-		}
-
-	}
-
-	getBusArgs { |readIndex, writeIndex, dryReadIndex, through, argumentIndex = (0)|
-		var readBus = this.getBusIndex(readIndex);
-		var writeBus = this.getBusIndex(writeIndex);
-		var dryReadBus = this.getBusIndex(dryReadIndex);
-		var argumentOffset = argumentIndex * numChannels;
-		writeBus = writeBus + argumentOffset;
-		^[\in, readBus, \out, writeBus, \dryIn, dryReadBus, \through, through]
 	}
 
 
