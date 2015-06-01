@@ -1,15 +1,14 @@
 StenoStack {
 
-	var busses;
+	var busIndices;
 
 	var dryReadIndex = 0, readIndex = 0, writeIndex = 0, through = 0, effectiveSynthIndex = 0, <argumentIndex;
 	var nestingDepth = 0, argStack;
 	var tokenIndices, tokenIndex;
 
-	*new { |busses|
-		^super.newCopyArgs(busses).init
+	*new { |busIndices|
+		^super.newCopyArgs(busIndices)
 	}
-
 
 	init {
 		tokenIndices = ();
@@ -141,19 +140,10 @@ StenoStack {
 
 	// generate synth arguments for in-out-mapping
 
-	getBusIndex { |index|
-		^if(index > busses.size) {
-			"graph structure too deep, increase maxBracketDepth".warn;
-			busses.last.index
-		} {
-			busses[index].index
-		}
-	}
-
 	getBusArgs { |readIndex, writeIndex, dryReadIndex, through, argumentIndex|
-		var readBus = this.getBusIndex(readIndex);
-		var writeBus = this.getBusIndex(writeIndex + (argumentIndex ? 0));
-		var dryReadBus = this.getBusIndex(dryReadIndex);
+		var readBus = busIndices.clipAt(readIndex);
+		var writeBus = busIndices.clipAt(writeIndex + (argumentIndex ? 0));
+		var dryReadBus = busIndices.clipAt(dryReadIndex);
 		^[\in, readBus, \out, writeBus, \dryIn, dryReadBus, \through, through]
 	}
 

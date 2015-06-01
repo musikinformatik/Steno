@@ -9,7 +9,7 @@ Steno {
 	var <>quant, <settings, <globalSettings;
 	var <encyclopedia, <operators;
 	var <monitor, <diff;
-	var <busses, <synthList, <argList, <variables;
+	var <busIndices, <synthList, <argList, <variables;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
 
@@ -44,8 +44,8 @@ Steno {
 	}
 
 	clear {
-		busses.do { |bus| if(bus.index.notNil) { bus.free } };
-		busses = nil;
+		server.audioBusAllocator.free(busIndices.first);
+		busIndices = nil;
 		variables.do { |bus| if(bus.index.notNil) { bus.free } };
 		variables = ();
 		this.freeAll;
@@ -195,26 +195,29 @@ Steno {
 			if(restart) { monitor.release } { ^this }
 		};
 		monitor = Synth(this.prefix(\monitor),
-			[\out, bus ? 0, \in, busses.first, \amp, 0.1],
+			[\out, bus ? 0, \in, busIndices.first, \amp, 0.1],
 			addAction:\addAfter
 		).register;
 
 	}
 
 	initBusses {
-		if(busses.isNil or: { busses.first.numChannels != numChannels }) {
-			busses = {
-				var bus = Bus.audio(Server.default, numChannels);
-				if(bus.isNil) { "not enough busses available!".warn };
-				bus
-			} ! maxBracketDepth
-		};
+		var n;
+		if(busIndices.isNil) {
+			n = numChannels * maxBracketDepth;
+			busIndices = server.audioBusAllocator.alloc(n);
+			if(busIndices.isNil) {
+				"not enough busses available! Please reboot server"
+				"or increase number of audio bus channels in ServerOptions".throw
+			};
+			busIndices = (busIndices, busIndices + numChannels .. n);
+		}
 	}
 	//////////////////// getting information about the resulting synth graph ////////////
 
 	dumpStructure { |postDryIn = false|
 		var header = String.fill(maxBracketDepth + 4, $-);
-		var findBus = { |bus| /*busses.indexOf(bus)*/ bus };
+		var findBus = { |bus| /*busIndices.indexOf(bus)*/ bus };
 		header = [header, "  %  ", header, "\n"].join;
 		argList.do { |args, i|
 			var in, out, dryIn;
@@ -242,19 +245,19 @@ Steno {
 		window.background = Color.black;
 		window.onClose = { run = false };
 		window.drawFunc = {
-			var prevNodes = Array.newClear(busses.size);
+			var prevNodes = Array.newClear(busIndices.size);
 			synthList.do { |synth, i|
 				var nodeSize = 20;
 				var args = argList.at(i);
 				var name = this.removePrefix(synth.defName);
 				var mul = Point(
-					window.bounds.width - (nodeSize * 2) / busses.size,
+					window.bounds.width - (nodeSize * 2) / busIndices.size,
 					window.bounds.height - (nodeSize * 2) / synthList.size
 				);
 				if(args.isEmpty.not and: { name != ')' }) {
-					in = busses.indexOf(args[1]);
-					//in = busses.indexOf(args[5]);
-					out = busses.indexOf(args[3]);
+					in = busIndices.indexOf(args[1]);
+					//in = busIndices.indexOf(args[5]);
+					out = busIndices.indexOf(args[3]);
 				} {
 					out = out ? 0;
 					in = in ? in;
@@ -563,7 +566,7 @@ Steno {
 	////////////////////////////////////////////////////////
 
 	initArguments {
-		argumentStack = StenoStack(busses);
+		argumentStack = StenoStack(busIndices);
 	}
 
 	calcNextArguments { |token, i|
