@@ -45,8 +45,10 @@ Steno {
 	}
 
 	clear {
-		server.audioBusAllocator.free(busIndices.first);
-		busIndices = nil;
+		busIndices !? {
+			server.audioBusAllocator.free(busIndices.first);
+			busIndices = nil;
+		};
 		variables.do { |bus| if(bus.index.notNil) { bus.free } };
 		variables = ();
 		this.freeAll;
@@ -605,7 +607,7 @@ Steno {
 			}
 		);
 		"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
-		"% args: %\n".postf(token, args);
+		//"% args: %\n".postf(token, args);
 
 
 		thisSetting = globalSettings.copy ? ();
@@ -615,6 +617,8 @@ Steno {
 		thisSetting.keysValuesDo { |key, val|
 			args = args.add(key).add(val.value(controls))
 		};
+
+		"% args: %\n".postf(token, args);
 		^args
 
 	}
