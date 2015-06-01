@@ -29,11 +29,10 @@ StenoStack {
 
 	beginSerial {
 		var args;
-		this.push;
 
+		this.push;
 		argumentIndex = nil;
 
-		// args for this synth
 		args = this.getBusArgs(readIndex, writeIndex + 1, readIndex, through, argumentIndex);
 
 		// set args for subsequent synths
@@ -50,7 +49,6 @@ StenoStack {
 
 		this.pop;
 
-		// args for this synth
 		args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 		// if we are in an operator, count up, because result will be one of the operands
 		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
@@ -78,8 +76,6 @@ StenoStack {
 
 		this.pop;
 
-
-		// args for this synth
 		args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
 		// if we are in an operator, count up, because result will be one of the operands
@@ -97,12 +93,11 @@ StenoStack {
 	}
 
 	endStack {
-		var previousWriteIndex = writeIndex + argumentIndex - 1; // sure?
+		var readFrom = writeIndex + argumentIndex - 1; // sure?
 
 		this.pop;
 
-		// args for this synth.
-		^this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex)
+		^this.getBusArgs(readFrom, writeIndex, dryReadIndex, through, argumentIndex)
 	}
 
 	inOperatorStack {
