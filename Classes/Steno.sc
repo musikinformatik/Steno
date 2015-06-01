@@ -98,6 +98,7 @@ Steno {
 	}
 
 	numChannels_ { |n|
+		if(n != numChannels) { busIndices = nil };
 		numChannels = n;
 		this.rebuild;
 	}
@@ -577,7 +578,6 @@ Steno {
 		args = switch(token,
 			'(', { argumentStack.beginSerial },
 			')', { argumentStack.endSerial },
-
 			'[', { argumentStack.beginParallel },
 			']', { argumentStack.endParallel },
 			'{', { argumentStack.beginStack },
