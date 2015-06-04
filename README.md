@@ -17,8 +17,9 @@ Semantics:
 Steno has a minimal syntax:
 
 - one letter is one synth: abc
-- square brackets: nested structure is parallel: [ab]c
-- round parentheses: nested structure is serial: [(ab)(ab)]
-- force a full replacement on eval: !abc
-- line ending comments are ignored: abc // this is a comment
+- square brackets: nested structure is parallel: ````[ab]c````
+- round parentheses: nested structure is serial: ````[(ab)(ab)]````
+- curly brackets: open a stack for operators in postfix syntax:  ````{ab*}```` or ````{abc*+}````
+- force a full replacement on eval: ````!abc````
+- line ending comments are ignored: ````abc // this is a comment````
 - variable names are optional and can be declared explicitly, see: -declareVariables
