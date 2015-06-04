@@ -216,7 +216,6 @@ Steno {
 			};
 
 			busIndices = busIndices + (0, numChannels .. n);
-			[\initBusses, busIndices].postln;
 		}
 	}
 	//////////////////// getting information about the resulting synth graph ////////////
@@ -606,7 +605,7 @@ Steno {
 				}
 			}
 		);
-		"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
+		//"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
 		//"% args: %\n".postf(token, args);
 
 
@@ -618,7 +617,7 @@ Steno {
 			args = args.add(key).add(val.value(controls))
 		};
 
-		"% args: %\n".postf(token, args);
+		//"% args: %\n".postf(token, args);
 		^args
 
 	}
