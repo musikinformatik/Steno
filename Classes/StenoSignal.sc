@@ -72,14 +72,16 @@ StenoSignal {
 
 	// set quelle output
 	quelleOutput { |signal, argNumChannels, offset = 0|
-		var localMix, localInput;
+		var localMix, localInput, oldSignal;
 		argNumChannels = min(argNumChannels ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
 
-		localInput = input.asArray.drop(offset).keep(argNumChannels);
-		signal = signal * (mix * env) + localInput;  // can't use Out here, because "in" can be different than "out"
+		oldSignal = In.ar(outBus + offset, argNumChannels);          // previous signal on bus
+		localInput = this.quelleInput(argNumChannels, offset);
+
+		signal = XFade2.ar(oldSignal, signal + oldSignal, (mix * env));  // can't use Out here, because "in" can be different than "out"
 		this.addOutput(signal, offset);
 	}
 
