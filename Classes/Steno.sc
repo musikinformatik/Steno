@@ -326,11 +326,12 @@ Steno {
 			var gate = \gate.kr(1);
 			var env = EnvGate(1.0, gate, doneAction:2);
 			var input = In.ar(in, numChannels);
+			var oldSignal = In.ar(out, numChannels);          // previous signal on bus
 			var controls = (index: synthIndex, depth: nestingDepth, env: env, mix: mix, gate: gate, numChannels: numChannels);
 
 			var output = this.valueUGenFunc(func, input, controls, multiChannelExpand, numChannels);
 
-			output = output * (mix * env) + input;
+			output = XFade2.ar(oldSignal, output + oldSignal, (mix * env) * 2 - 1);
 			ReplaceOut.ar(out, output); // can't use Out here, because in can be different than out
 			if(verbosity > 0) { ("new source synth def: \"%\" with % channels\n").postf(name, output.size) };
 		}, update);
