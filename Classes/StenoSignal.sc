@@ -82,6 +82,7 @@ StenoSignal {
 		localInput = this.quelleInput(argNumChannels, offset);
 
 		signal = XFade2.ar(oldSignal, signal + oldSignal, (mix * env));  // can't use Out here, because "in" can be different than "out"
+		FreeSelfWhenDone.kr(env);
 		this.addOutput(signal, offset);
 	}
 
