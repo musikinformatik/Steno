@@ -178,6 +178,8 @@ Steno {
 					};
 					if(verbosity > 0) { string.postcs };
 					diff.value(string)
+					//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
+					// if we use this one, we should use events instead of synths. then alsoprevTokens needs to be changed.
 				} {
 					server.closeBundle(server.latency);
 				}
