@@ -101,14 +101,16 @@ Steno {
 	}
 
 	numChannels_ { |n|
-		if(n != numChannels) { busIndices = nil };
-		numChannels = n;
-		this.rebuild;
+		if(n != numChannels) {
+			busIndices = nil;
+			numChannels = n;
+			this.rebuildGraph;
+		};
 	}
 
 	expand_ { |flag|
 		expand = flag;
-		this.rebuild;
+		this.rebuildGraph;
 	}
 
 	bus_ { |argBus|
@@ -126,6 +128,18 @@ Steno {
 			this.rebuildSynthDefs;
 			server.sync;
 			this.resendSynths;
+			this.startMonitor(restart: true);
+		}
+	}
+
+	rebuildGraph {
+		fork {
+			this.freeAll;
+			this.initBusses;
+			this.initSynthDefs;
+			this.rebuildSynthDefs;
+			server.sync;
+			this.value(rawCmdLine);
 			this.startMonitor(restart: true);
 		}
 	}
@@ -163,7 +177,6 @@ Steno {
 						string = string.drop(1);
 					};
 					if(verbosity > 0) { string.postcs };
-					this.initArguments; // quick bandaid for an init bug.
 					diff.value(string)
 				} {
 					server.closeBundle(server.latency);
@@ -211,8 +224,8 @@ Steno {
 			n = numChannels * maxBracketDepth;
 			busIndices = server.audioBusAllocator.alloc(n);
 			if(busIndices.isNil) {
-				"not enough busses available! Please reboot server"
-				"or increase number of audio bus channels in ServerOptions".throw
+				"not enough busses available! Please reboot the server"
+				"or increase the number of audio bus channels in ServerOptions".throw
 			};
 
 			busIndices = busIndices + (0, numChannels .. n);
@@ -296,7 +309,9 @@ Steno {
 	filter { |name, func, multiChannelExpand, update = true, numChannels|
 		numChannels = min(numChannels ? this.numChannels, this.numChannels);
 		this.addSynthDef(name, {
-			var stenoSignal = StenoSignal(numChannels);
+			var stenoSignal, signalNumChannels;
+			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
+			stenoSignal = StenoSignal(numChannels);
 			stenoSignal.filter(func, multiChannelExpand ? expand, numChannels);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new filter: \"%\" with % channels\n").postf(name, numChannels) };
@@ -305,12 +320,13 @@ Steno {
 
 	quelle { |name, func, multiChannelExpand, update = true, numChannels|
 
-		numChannels = min(numChannels ? this.numChannels, this.numChannels);
 		this.addSynthDef(name, {
-			var stenoSignal = StenoSignal(numChannels);
-			stenoSignal.quelle(func, multiChannelExpand ? expand, numChannels);
+			var stenoSignal, signalNumChannels;
+			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
+			stenoSignal = StenoSignal(signalNumChannels);
+			stenoSignal.quelle(func, multiChannelExpand ? expand, signalNumChannels);
 			stenoSignal.writeToBus;
-			if(verbosity > 0) { ("new quelle: \"%\" with % channels\n").postf(name, numChannels) };
+			if(verbosity > 0) { ("new quelle: \"%\" with % channels\n").postf(name, signalNumChannels) };
 		}, update);
 	}
 
@@ -319,7 +335,9 @@ Steno {
 
 		numChannels = min(numChannels ? this.numChannels, this.numChannels);
 		this.addSynthDef(name, {
-			var stenoSignal = StenoSignal(numChannels, multiChannelExpand);
+			var stenoSignal, signalNumChannels;
+			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
+			stenoSignal = StenoSignal(numChannels, multiChannelExpand);
 			func.value(stenoSignal.input, stenoSignal);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new struktur: \"%\" with % channels\n").postf(name, numChannels) };
@@ -327,13 +345,13 @@ Steno {
 	}
 
 	operator { |name, func, arity = 2, multiChannelExpand, update = true|
-		var numChannels = this.numChannels;
-		var totalNumChannels = numChannels * arity;
-		var updateSubgraph;
 
-		updateSubgraph = this.prevTokens.includes(name) and: { operators[name] != arity };
+		var updateSubgraph = this.prevTokens.includes(name) and: { operators[name] != arity };
 
 		this.addSynthDef(name, {
+			var numChannels = this.numChannels;
+			var totalNumChannels = numChannels * arity;
+
 			var stenoSignal = StenoSignal(totalNumChannels);
 			var inputs = { |i|
 				stenoSignal.filterInput(numChannels, i * numChannels);
@@ -612,7 +630,7 @@ Steno {
 		thisSetting = globalSettings.copy ? ();
 		settings.at(token) !? { thisSetting.putAll(settings.at(token)) };
 
-		 // we allow functions in settings to expand dependent on current state
+		// we allow functions in settings to expand dependent on current state
 		thisSetting.keysValuesDo { |key, val|
 			args = args.add(key).add(val.value(controls))
 		};
