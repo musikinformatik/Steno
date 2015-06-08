@@ -460,8 +460,8 @@ Steno {
 			var oldSignal = In.ar(out, numChannels);
 			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
 			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
-			XOut.ar(out, EnvGate.new, output);
 			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
+			XOut.ar(out, EnvGate.new, output);
 		}, force:true);
 
 		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }, force:true); // if not found use this.
