@@ -240,17 +240,25 @@ Steno {
 		var findBus = { |bus| busIndices.indexOf(bus) };
 		header = [header, "  %  ", header, "\n"].join;
 		argList.do { |args, i|
-			var in, out, dryIn;
-			header.postf(this.removePrefix(synthList.at(i).defName));
+			var in, out, dryIn, token, arity;
+			token = this.removePrefix(synthList.at(i).defName);
+			header.postf(token);
 
 			if(args.isEmpty.not) {
 				in = findBus.(args[1]);
 				out = findBus.(args[3]);
 				dryIn = findBus.(args[5]);
 
-				in.do { "   ".post }; in.postln;
+				in.do { "   ".post }; in.post;
+				arity = operators[token];
+				if(arity.notNil) {
+					(arity - 1).do { "__".post };
+					(in + arity - 1).post;
+				};
+				"\n".post;
 				if(postDryIn) { dryIn.do { "   ".post }; "(%)\n".postf(dryIn) };
 				out.do { "   ".post }; out.postln;
+
 			}
 		}
 	}
@@ -654,6 +662,10 @@ Steno {
 				if(str[0] == $!) { doResend = true; str = str.drop(1); };
 				str = str.replace("\n", " ");
 			};
+
+			// strip trailing whitespace
+			while { str[0].isSpace } { str = str.drop(1) };
+			while { str[str.size - 1].isSpace } { str = str.drop(-1) };
 
 			// bring the string into regular form: if it has a gap on the top level ...
 			str = str.doBrackets({ |token, i, scope, outerScope, scopeStack|

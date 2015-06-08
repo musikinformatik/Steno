@@ -30,6 +30,9 @@ StenoStack {
 	beginSerial {
 		var args;
 
+		// if we are in an operator, count up, because result will be one of the operands
+		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
+
 		this.push;
 		argumentIndex = nil;
 
@@ -51,8 +54,6 @@ StenoStack {
 
 		args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
-		// if we are in an operator, count up, because result will be one of the operands
-		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
 
 		^args
 	}
@@ -90,7 +91,8 @@ StenoStack {
 	beginStack {
 		var args = this.beginParallel;
 		// nary operators
-		through = argumentIndex = 0;
+		through = 0;
+		argumentIndex = 0;
 		^args
 	}
 
