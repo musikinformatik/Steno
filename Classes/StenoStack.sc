@@ -16,7 +16,7 @@ StenoStack {
 
 	push {
 		// save current args on stack
-		argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
+		argStack = argStack.add([readIndex, writeIndex, dryReadIndex, through, argumentIndex]);
 		nestingDepth = nestingDepth + 1;
 	}
 
@@ -36,7 +36,7 @@ StenoStack {
 		this.push;
 		argumentIndex = nil;
 
-		args = this.getBusArgs(readIndex, writeIndex + 1, readIndex, through, argumentIndex);
+		args = this.getBusArgs(readIndex, writeIndex + 1, readIndex, 0, argumentIndex); // no through
 
 		// set args for subsequent synths
 		dryReadIndex = readIndex;
@@ -54,6 +54,8 @@ StenoStack {
 
 		args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
+		// if we are in an operator, count up, because result will be one of the operands
+		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
 
 		^args
 	}

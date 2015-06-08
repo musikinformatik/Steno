@@ -252,7 +252,8 @@ Steno {
 				in.do { "   ".post }; in.post;
 				arity = operators[token];
 				if(arity.notNil) {
-					(arity - 1).do { "__".post };
+					(arity - 2).do { "___".post };
+					"__".post;
 					(in + arity - 1).post;
 				};
 				"\n".post;
@@ -405,6 +406,7 @@ Steno {
 	// building synth defs
 
 	initSynthDefs {
+		var routingFunction, dummyOpeningFunction;
 		// we always go through a limiter here.
 		this.addSynthDef(\monitor, { |out, in, amp = 0.1|
 			Out.ar(out,
@@ -416,53 +418,44 @@ Steno {
 			)
 		}, force:true);
 
-		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
-			var feedbackIn = InFeedback.ar(in, numChannels); // out: bus inside parenthesis
-			//DelayL.ar(InFeedback.ar(in, numChannels), Rand(0.1), 0.1);
-			var drySignal = In.ar(dryIn, numChannels); // dryIn: bus outside parenthesis
-			var oldSignal = In.ar(out, numChannels);
-			var output = XFade2.ar(drySignal, feedbackIn + (through * oldSignal), mix * 2 - 1);
-			XOut.ar(out, EnvGate.new, output);
-			// here is a problem, actually we can't reuse a bus that is used for feedback (unless: we want to mix in several feedbacks).
-			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
-		}, force:true);
-
-		this.addSynthDef(')', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var drySignal = In.ar(in, numChannels); // in: result of serial synths
-			var oldSignal = In.ar(out, numChannels);
+		// same for all closing brackets
+		// mix controls balance between serial bus result and outside bus
+		routingFunction = { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
+			var input = In.ar(in, numChannels); // in: result of serial synths
+			var oldSignal = In.ar(out, numChannels); // the old signal on the bus, mixed in by through
 			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
-			var output = XFade2.ar(inputOutside, drySignal + (through * oldSignal), mix * 2 - 1);
+			var signalOnMixBus = input + (through * oldSignal);
+			var output = XFade2.ar(inputOutside, signalOnMixBus, mix * 2 - 1);
+			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
 			XOut.ar(out, EnvGate.new, output); // overwrite the out channel with the new mix
-		}, force:true);
+		};
 
-		this.addSynthDef('[', { |in, out|
+		// nothing to do, just clean up bus, to be sure.
+		dummyOpeningFunction = { |in, out|
 			ReplaceOut.ar(out, Silent.ar(numChannels)); // umbrella
 			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
-		}, force:true);
+		};
 
-		this.addSynthDef(']', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var input = In.ar(in, numChannels);  // in: mix of all parallel synths
+		// begin serial: dry = in
+		/*
+		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
+			var input = In.ar(in, numChannels); // dryIn: bus outside parenthesis
 			var oldSignal = In.ar(out, numChannels);
-			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
-			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
-			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
+			var output = XFade2.ar(input, through * oldSignal, mix * 2 - 1);
+			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
 			XOut.ar(out, EnvGate.new, output);
 		}, force:true);
+		*/
 
 
-		this.addSynthDef('{', { |in, out|
-			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
-		}, force:true);
+		this.addSynthDef('(', routingFunction, force:true);
 
-		// same as ]
-		this.addSynthDef('}', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var input = In.ar(in, numChannels);  // in: current stack output
-			var oldSignal = In.ar(out, numChannels);
-			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
-			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
-			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
-			XOut.ar(out, EnvGate.new, output);
-		}, force:true);
+		this.addSynthDef('[', dummyOpeningFunction, force:true);
+		this.addSynthDef('{', dummyOpeningFunction, force:true);
+
+		this.addSynthDef(')', routingFunction, force:true);
+		this.addSynthDef(']', routingFunction, force:true);
+		this.addSynthDef('}', routingFunction, force:true);
 
 		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }, force:true); // if not found use this.
 
