@@ -113,19 +113,21 @@ StenoStack {
 		^argumentIndex.notNil
 	}
 
-	pushOperator { |arity|
+	pushOperator { |token, arity|
 		var args;
 		argumentIndex = max(0, argumentIndex - arity);
 		// args for this synth: in this case: read from the last argument index.
 		args = this.getBusArgs(writeIndex + argumentIndex, writeIndex, dryReadIndex, through, argumentIndex);
+		this.updateControls(token); // for the next letter
 		// if we are in an operator, count up, next token will represent the next argument
 		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
 		^args
 	}
 
-	pushLetter {
+	pushLetter { |token|
 		var args;
 		args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex);
+		this.updateControls(token); // for the next letter
 		// if we are in an operator, count up, next token will represent the next argument
 		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
 		^args
@@ -134,7 +136,7 @@ StenoStack {
 	updateControls { |token|
 		// generate some extra information that is passed as arguments to the next synth
 		effectiveSynthIndex = effectiveSynthIndex + 1; // only count up for normal synths, not for brackets
-		tokenIndices[token] = tokenIndex = if(tokenIndices[token].isNil) { 0 } { tokenIndices[token] + 1 };
+		//tokenIndices[token] = tokenIndex = if(tokenIndices[token].isNil) { 0 } { tokenIndices[token] + 1 };
 
 	}
 

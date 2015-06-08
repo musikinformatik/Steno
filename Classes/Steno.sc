@@ -598,6 +598,7 @@ Steno {
 		var args, thisSetting, arity, controls;
 
 		token = token.asSymbol;
+		argumentStack ?? { this.initArguments };
 		controls = argumentStack.controls;
 
 		args = switch(token,
@@ -618,7 +619,7 @@ Steno {
 					argumentStack.pushLetter(token)
 				} {
 					if(arity.notNil) {
-						argumentStack.pushOperator(arity)
+						argumentStack.pushOperator(token, arity)
 					} {
 						argumentStack.pushLetter(token)
 					}
