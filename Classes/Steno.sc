@@ -658,7 +658,7 @@ Steno {
 			if(str.notEmpty) {
 				while { str[0].isSpace } { str = str.drop(1) };
 				while { str[str.size - 1].isSpace } { str = str.drop(-1) };
-			}
+			};
 
 			// bring the string into regular form: if it has a gap on the top level ...
 			str = str.doBrackets({ |token, i, scope, outerScope, scopeStack|

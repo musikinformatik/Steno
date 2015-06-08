@@ -81,10 +81,11 @@ StenoStack {
 
 		this.pop;
 
+
+
 		args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
-		// if we are in an operator, count up, because result will be one of the operands
-		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
+
 
 		^args
 
