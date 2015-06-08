@@ -306,8 +306,9 @@ Steno {
 		^window.front;
 	}
 
-	dotStructure { |title|
-		^this.cmdLine.stenoDotStructure(title, this.maxBracketDepth, variables.keys)
+	dotStructure { |title, attributes|
+		attributes = attributes ?? { "rankdir=LR;" };
+		^this.cmdLine.stenoDotStructure(title ? cmdLine, attributes, variables.keys, operators)
 	}
 
 
@@ -786,25 +787,27 @@ Steno {
 	// return dot file for graphviz little language
 	// we assume that syntax has already been checked.
 
-	stenoDotStructure { |title = "untitled", attributes = "", variableNames|
+	stenoDotStructure { |title = "untitled", attributes = "", variableNames, operators|
 		var labelString = "", graphString = "", variableLinks = ();
+		operators = operators.copy;
 		this.do { |char, i|
 			labelString = labelString ++ format("% [label=\"%\"];\n", i, char);
 		};
 		this.doBrackets({ |token, i, scope, outerScope|
+			var arity = operators[token.asSymbol];
 			if("([{".includes(token)) {
 				if(outerScope.notNil) { // on opening a bracket: connect to previous
 					scope[\prevNode] = outerScope[\prevNode];
 				};
 			};
-			if("]}".includes(token).not) { // no need to link forward to next bracket
+			if("]".includes(token).not and: { arity.isNil }) { // no need to link forward to next bracket
 				// print link to previous
 				scope[\prevNode] !? {
 					graphString = graphString ++ "% -> %;\n".format(scope[\prevNode], i);
 				};
 			};
 			// closing context
-			if("])}".includes(token)) {
+			if("])".includes(token)) {
 				// print uplinks in parallel graph
 				scope[\upLinks].do { |x|
 					graphString = graphString ++ "% -> %;\n".format(x, i);
@@ -812,20 +815,31 @@ Steno {
 				// now we can move outside:
 				scope = outerScope;
 			};
-
-			// if serial, link to previous
-			// if parallel, link to top.
-
-			if(scope[\modus] == \parallel) {
+			if(arity.notNil) {
+				// print uplinks in parallel graph
+				format("index: %\n%\n\n", i, scope.cs).postln;
+				scope[\upLinks].keep(arity.neg).do { |x|
+					graphString = graphString ++ "% -> %;\n".format(x, i).postln;
+				};
+				scope[\upLinks] = scope[\upLinks].drop(arity.neg);
+				scope[\prevNode] = i;
 				scope[\upLinks] = scope[\upLinks].add(i);
 			} {
-				scope[\prevNode] = i;
+
+				// if serial, link to previous
+				// if parallel, link to top.
+
+				switch(scope[\modus],
+					\parallel, { scope[\upLinks] = scope[\upLinks].add(i) },
+					\stack, { scope[\upLinks] = scope[\upLinks].add(i) },
+					{ scope[\prevNode] = i }
+				);
 			};
 
 			// switch modus
 			if(token == $() { scope[\modus] = \serial };
 			if(token == $[) { scope[\modus] = \parallel };
-			if(token == ${) { scope[\modus] = \parallel };
+			if(token == ${) { scope[\modus] = \stack };
 
 			scope // return new current scope for next iteration
 
@@ -844,7 +858,7 @@ Steno {
 			};
 		};
 		// ^"digraph %\n{\n%\n%\n}\n}".format(title, attributes, labelString, graphString)
-		^"digraph %\n{\n%\n".format(title, attributes) ++ labelString ++ "\n" ++ graphString ++ "}\n}"
+		^"digraph %\n{\n%\n".format("", attributes) ++ labelString ++ "\n" ++ graphString ++ "}\n}"
 	}
 
 
