@@ -306,9 +306,10 @@ Steno {
 		^window.front;
 	}
 
-	dotStructure { |title, attributes|
-		attributes = attributes ?? { "rankdir=LR;" };
-		^this.cmdLine.stenoDotStructure(title ? cmdLine, attributes, variables.keys, operators)
+	dotStructure { |title, attributes, labelAttributes|
+		attributes = attributes ?? { "rankdir=LR;\nfontname=Courier;\nlabel=\"\n\n%\"".format(cmdLine) };
+		labelAttributes = labelAttributes ?? { "fontname=Courier" };
+		^this.cmdLine.stenoDotStructure(title ? cmdLine, attributes, variables.keys, operators, labelAttributes)
 	}
 
 
@@ -382,7 +383,7 @@ Steno {
 		names.do { |name|
 			name = name.asSymbol;
 			if(variables[name].isNil) {
-
+				"new variable as ".post;
 				this.filter(name, { |input, controls|
 					var bus = Bus.audio(server, numChannels);
 					var in = XFade2.ar(In.ar(bus, numChannels), InFeedback.ar(bus, numChannels), \feedback.kr.linlin(0, 1, -1, 1));
@@ -787,12 +788,13 @@ Steno {
 	// return dot file for graphviz little language
 	// we assume that syntax has already been checked.
 
-	stenoDotStructure { |title = "untitled", attributes = "", variableNames, operators|
+	stenoDotStructure { |title = "untitled", attributes = "", variableNames, operators, labelAttributes = ""|
 		var labelString = "", graphString = "", variableLinks = ();
 		operators = operators.copy;
 		this.do { |char, i|
-			labelString = labelString ++ format("% [label=\"%\"];\n", i, char);
+			labelString = labelString ++ format("% [label=\"%\"; %];\n", i, char, labelAttributes);
 		};
+		labelString = labelString ++ format("% [label=\"%\"; %];\n", this.size, "out", labelAttributes);
 		this.doBrackets({ |token, i, scope, outerScope|
 			var arity = operators[token.asSymbol];
 			if("([{".includes(token)) {
@@ -807,7 +809,7 @@ Steno {
 				};
 			};
 			// closing context
-			if("])".includes(token)) {
+			if("])}".includes(token)) {
 				// print uplinks in parallel graph
 				scope[\upLinks].do { |x|
 					graphString = graphString ++ "% -> %;\n".format(x, i);
@@ -816,10 +818,9 @@ Steno {
 				scope = outerScope;
 			};
 			if(arity.notNil) {
-				// print uplinks in parallel graph
-				format("index: %\n%\n\n", i, scope.cs).postln;
+				// print uplinks in operator stack graph
 				scope[\upLinks].keep(arity.neg).do { |x|
-					graphString = graphString ++ "% -> %;\n".format(x, i).postln;
+					graphString = graphString ++ "% -> %;\n".format(x, i);
 				};
 				scope[\upLinks] = scope[\upLinks].drop(arity.neg);
 				scope[\prevNode] = i;
@@ -852,13 +853,16 @@ Steno {
 					if(variableLinks.at(name).isNil) {
 						variableLinks.put(name, i) // define a new variable
 					} {
-						graphString = graphString ++ "% -> %;\n".format(variableLinks.at(name), i);// ERRROR HERE?
+						"found:".postln;
+						graphString = graphString ++ "% -> %;\n".format(variableLinks.at(name), i);
 					}
 				}
 			};
 		};
+		graphString = graphString ++ "% -> %;\n".format(this.size - 1, this.size);
+
 		// ^"digraph %\n{\n%\n%\n}\n}".format(title, attributes, labelString, graphString)
-		^"digraph %\n{\n%\n".format("", attributes) ++ labelString ++ "\n" ++ graphString ++ "}\n}"
+		^"\n\ndigraph %\n{\n%\n".format("", attributes) ++ labelString ++ "\n" ++ graphString ++ "}\n}"
 	}
 
 
