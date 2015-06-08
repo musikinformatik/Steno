@@ -124,7 +124,6 @@ Steno {
 	rebuild {
 		fork {
 			this.initBusses;
-			this.initSynthDefs;
 			this.rebuildSynthDefs;
 			server.sync;
 			this.resendSynths;
@@ -136,7 +135,6 @@ Steno {
 		fork {
 			this.freeAll;
 			this.initBusses;
-			this.initSynthDefs;
 			this.rebuildSynthDefs;
 			server.sync;
 			this.value(rawCmdLine);
