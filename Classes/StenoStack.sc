@@ -30,17 +30,18 @@ StenoStack {
 	beginSerial {
 		var args;
 
-		// if we are in an operator, count up, because result will be one of the operands
-		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
 
 		this.push;
+
+		writeIndex = writeIndex + 1;
+		argumentIndex !? { writeIndex = writeIndex + argumentIndex };
 		argumentIndex = nil;
 
-		args = this.getBusArgs(readIndex, writeIndex + 1, readIndex, 0, argumentIndex); // no through
+		args = this.getBusArgs(readIndex, writeIndex, readIndex, 0, argumentIndex); // no through
 
 		// set args for subsequent synths
 		dryReadIndex = readIndex;
-		readIndex = writeIndex = writeIndex + 1;
+		readIndex = writeIndex;
 		through = 0.0;
 		^args
 	}
@@ -52,6 +53,7 @@ StenoStack {
 
 		this.pop;
 
+
 		args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
 		// if we are in an operator, count up, because result will be one of the operands
@@ -62,8 +64,9 @@ StenoStack {
 
 	beginParallel {
 
-		this.push;
 
+		this.push;
+		argumentIndex !? { writeIndex = writeIndex + argumentIndex };
 		argumentIndex = nil;
 
 		// set args for subsequent synths
@@ -81,10 +84,10 @@ StenoStack {
 
 		this.pop;
 
-
-
 		args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
 
+		// if we are in an operator, count up, because result will be one of the operands
+		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
 
 
 		^args
@@ -102,7 +105,7 @@ StenoStack {
 	endStack {
 		var args, readFrom;
 
-		readFrom = writeIndex + argumentIndex - 1; // sure?
+		readFrom = writeIndex + argumentIndex - 1;
 
 		this.pop;
 
