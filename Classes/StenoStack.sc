@@ -50,8 +50,10 @@ StenoStack {
 		this.pop;
 
 		args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
+
 		// if we are in an operator, count up, because result will be one of the operands
 		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
+
 		^args
 	}
 
@@ -80,6 +82,7 @@ StenoStack {
 
 		// if we are in an operator, count up, because result will be one of the operands
 		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
+
 		^args
 
 	}
@@ -92,11 +95,18 @@ StenoStack {
 	}
 
 	endStack {
-		var readFrom = writeIndex + argumentIndex - 1; // sure?
+		var args, readFrom;
+
+		readFrom = writeIndex + argumentIndex - 1; // sure?
 
 		this.pop;
 
-		^this.getBusArgs(readFrom, writeIndex, dryReadIndex, through, argumentIndex)
+		args = this.getBusArgs(readFrom, writeIndex, dryReadIndex, through, argumentIndex);
+
+		// if we are in an operator, count up, because result will be one of the operands
+		if(argumentIndex.notNil) { argumentIndex = argumentIndex + 1 };
+
+		^args
 	}
 
 	inOperatorStack {
