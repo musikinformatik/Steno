@@ -645,7 +645,7 @@ Steno {
 
 	*defaultPreProcessor {
 		^#{ |str, steno|
-			var newStr = str.class.new, doResend = false, currentClump = str.class.new, hasGap = false;
+			var newStr = str.class.new, doResend = false, currentClump = str.class.new, hasGap = false, char;
 
 			if(str.isNil) {
 				str = steno.cmdLine ? str.class.new; doResend = true;
@@ -655,8 +655,8 @@ Steno {
 			};
 
 			// strip trailing whitespace
-			while { str[0].isSpace } { str = str.drop(1) };
-			while { str[str.size - 1].isSpace } { str = str.drop(-1) };
+			while { char = str[0]; char.notNil and: { char.isSpace  } } { str = str.drop(1) };
+			while { char = str[str.size - 1]; char.notNil and: { char.isSpace  } } { str = str.drop(-1) };
 
 			// bring the string into regular form: if it has a gap on the top level ...
 			str = str.doBrackets({ |token, i, scope, outerScope, scopeStack|
