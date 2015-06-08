@@ -428,7 +428,7 @@ Steno {
 		}, force:true);
 
 		this.addSynthDef(')', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var drySignal = In.ar(in, numChannels); // out: bus inside parenthesis
+			var drySignal = In.ar(in, numChannels); // in: result of serial synths
 			var oldSignal = In.ar(out, numChannels);
 			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
 			var output = XFade2.ar(inputOutside, drySignal + (through * oldSignal), mix * 2 - 1);
@@ -441,7 +441,7 @@ Steno {
 		}, force:true);
 
 		this.addSynthDef(']', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var input = In.ar(in, numChannels);  // in: bus outside parenthesis
+			var input = In.ar(in, numChannels);  // in: mix of all parallel synths
 			var oldSignal = In.ar(out, numChannels);
 			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
 			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
@@ -456,7 +456,7 @@ Steno {
 
 		// same as ]
 		this.addSynthDef('}', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var input = In.ar(in, numChannels);  // in: bus outside parenthesis
+			var input = In.ar(in, numChannels);  // in: current stack output
 			var oldSignal = In.ar(out, numChannels);
 			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
 			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
