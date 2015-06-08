@@ -655,8 +655,10 @@ Steno {
 			};
 
 			// strip trailing whitespace
-			while { char = str[0]; char.notNil and: { char.isSpace  } } { str = str.drop(1) };
-			while { char = str[str.size - 1]; char.notNil and: { char.isSpace  } } { str = str.drop(-1) };
+			if(str.notEmpty) {
+				while { str[0].isSpace } { str = str.drop(1) };
+				while { str[str.size - 1].isSpace } { str = str.drop(-1) };
+			}
 
 			// bring the string into regular form: if it has a gap on the top level ...
 			str = str.doBrackets({ |token, i, scope, outerScope, scopeStack|
