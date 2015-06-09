@@ -11,11 +11,13 @@ StenoSignal {
 	}
 
 	init {
+		var attack;
 		inBus = \in.kr(0);
 		outBus = \out.kr(0);
 		gate = \gate.kr(1);
 		fadeTime = \fadeTime.kr(0.02);
-		env = EnvGen.kr(Env.asr(0, 1, fadeTime), gate);
+		attack = \attack.kr(0);
+		env = EnvGen.kr(Env.asr(attack * fadeTime, 1, fadeTime), gate);
 		mix = \mix.kr(1);
 		through = \through.kr(0);
 		dryIn = \dryIn.kr(0);
@@ -30,7 +32,9 @@ StenoSignal {
 			gate: gate,
 			numChannels: numChannels,
 			through: through,
-			env: env
+			env: env,
+			fadeTime: fadeTime,
+			attack: attack
 		);
 	}
 
@@ -81,7 +85,7 @@ StenoSignal {
 		oldSignal = In.ar(outBus + offset, argNumChannels);          // previous signal on bus
 		localInput = this.quelleInput(argNumChannels, offset);
 
-		signal = XFade2.ar(oldSignal, signal + oldSignal, (mix * env));  // can't use Out here, because "in" can be different than "out"
+		signal = XFade2.ar(oldSignal, signal + oldSignal, (mix * env) * 2 - 1);  // can't use Out here, because "in" can be different than "out"
 		FreeSelfWhenDone.kr(env);
 		this.addOutput(signal, offset);
 	}
