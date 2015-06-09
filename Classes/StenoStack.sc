@@ -1,17 +1,14 @@
 StenoStack {
 
-	var busIndices;
+	var busIndices, <controls;
+	var argStack;
 
-	var dryReadIndex = 0, readIndex = 0, writeIndex = 0, through = 0, effectiveSynthIndex = 0, <argumentIndex;
-	var nestingDepth = 0, argStack;
-	var tokenIndices, tokenIndex;
+	var dryReadIndex = 0, readIndex = 0, writeIndex = 0, through = 0, <argumentIndex;
+	var nestingDepth = 0, effectiveSynthIndex = 0;
+
 
 	*new { |busIndices|
-		^super.newCopyArgs(busIndices)
-	}
-
-	init {
-		tokenIndices = ();
+		^super.newCopyArgs(busIndices, (tokenIndices: (), synthIndex: -1))
 	}
 
 	push {
@@ -143,17 +140,13 @@ StenoStack {
 
 	updateControls { |token|
 		// generate some extra information that is passed as arguments to the next synth
-		effectiveSynthIndex = effectiveSynthIndex + 1; // only count up for normal synths, not for brackets
-		//tokenIndices[token] = tokenIndex = if(tokenIndices[token].isNil) { 0 } { tokenIndices[token] + 1 };
-
-	}
-
-	controls {
-		^(
-			synthIndex: effectiveSynthIndex,
-			nestingDepth: nestingDepth,
-			tokenIndex: tokenIndex
-		)
+		controls.use {
+			var tokenIndex = ~tokenIndices[token];
+			~tokenIndices[token] = ~index = if(tokenIndex.isNil) { 0 } { tokenIndex + 1 };
+			~token = token;
+			~depth = nestingDepth;
+			~synthIndex = ~synthIndex + 1; // only count up for normal synths, not for brackets
+		}
 	}
 
 	// generate synth arguments for in-out-mapping

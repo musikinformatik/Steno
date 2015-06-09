@@ -632,7 +632,7 @@ Steno {
 
 
 		thisSetting = globalSettings.copy ? ();
-		settings.at(token) !? { thisSetting.putAll(settings.at(token)) };
+		settings.at(token) !? { thisSetting.putAll(settings.at(token)).value(controls) };
 
 		// we allow functions in settings to expand dependent on current state
 		thisSetting.keysValuesDo { |key, val|
