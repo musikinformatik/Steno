@@ -673,7 +673,7 @@ Steno {
 			str.doBrackets({ |char, i, scope, outerScope|
 				var fstr;
 				if("([".includes(char)) {
-					outerScope[\currentClump] = currentClump  ++ char;
+					outerScope[\currentClump] = currentClump ++ char;
 					currentClump = "";
 				} {
 					if(")]".includes(char)) {
@@ -685,7 +685,11 @@ Steno {
 						};
 						currentClump = outerScope[\currentClump] ++ currentClump ++ char;
 					} {
-						currentClump = currentClump ++ char;
+						if(char == $}) {
+							currentClump = currentClump.replace(" ", "") ++ char;
+						} {
+							currentClump = currentClump ++ char;
+						}
 					}
 				};
 			}, false, false); // todo: check if we can avoid double checking below
