@@ -349,7 +349,7 @@ Steno {
 			var stenoSignal, signalNumChannels;
 			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
 			stenoSignal = StenoSignal(numChannels, multiChannelExpand);
-			func.value(stenoSignal.input, stenoSignal);
+			func.value(stenoSignal.input, stenoSignal); // pass the signal object here, so func can use it
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new struktur: \"%\" with % channels\n").postf(name, numChannels) };
 		}, update);
@@ -367,7 +367,7 @@ Steno {
 			var inputs = { |i|
 				stenoSignal.filterInput(numChannels, i * numChannels);
 			} ! arity;
-			var outputs = func.value(*inputs.keep(arity)).asArray.keep(numChannels); // todo pass controls.
+			var outputs = func.value(*inputs.keep(arity).add(stenoSignal.controls)).asArray.keep(numChannels);
 
 			stenoSignal.filterOutput(outputs, numChannels);
 			stenoSignal.writeToBus;

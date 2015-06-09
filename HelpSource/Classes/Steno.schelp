@@ -169,8 +169,32 @@ Ndef(\x, { MouseX.kr(0.1, 10, 1) });
 t.set(\b, \modrate, Ndef(\x));
 ::
 
+note::when the value is a function, it is called for each synth, and controls are passed in, as to allow arguments to depend on the graph::
 
-Special values are: strong::fadeTime:: (cross fade time, default: 0.02), strong::mix:: (sound level, default: 1), strong::through:: (for filters: pre vs. post level, default: 0), and strong::hangTime:: (for filters, as a maximum release tail length, unless fadeTime is longer (default: 30)).
+code::
+(
+t = Steno.new;
+t.quelle(\a, { SinOsc.ar(\freq.kr(440)) });
+t.set(\a, \freq, { |args| args.postcs; args[\index] * 200 + 400 * args[\depth].neg.midiratio });
+)
+
+
+t.value("a");
+t.value("aa");
+t.value("aaaa");
+t.value("aa(a(aa))");
+::
+
+
+Special values are:
+table::
+##strong::fadeTime:: || cross fade time ||  default: 0.02
+##strong::attack:: || ratio of fadeTime used as attack (for 1, it equals fadeTime) || default: 0
+##strong::mix:: || sound level || default: 1
+##strong::through:: || for filters: pre vs. post level || default: 0
+##strong::hangTime:: || for filters, as a maximum release tail length, unless fadeTime is longer || default: 30
+::
+
 code::
 t = Steno.new;
 t.set(\a, \fadeTime, 2.0);
@@ -189,6 +213,7 @@ Dictionary of synth arguments for each synth function. Each set of arguments is 
 
 method::setGlobal
 Dictionary of synth arguments for all synth functions (for Special values, see link::#-set::).
+
 code::
 t = Steno.new;
 t.setGlobal(\fadeTime, 2.0);
@@ -197,6 +222,22 @@ t.globalSettings; // settings are a global dictionary
 
 argument::... keyValuePairs
 Any number of parmeters and values. Values can be anything that can be converted to a synth argument.
+
+note::when the value is a function, it is called for each synth, and controls are passed in, as to allow arguments to depend on the graph::
+
+code::
+(
+t =  Steno.new;
+t.quelle(\a, { SinOsc.ar(\freq.kr(440)) });
+t.setGlobal(\freq, { |args| args.postcs; args[\index] * 200 + 400 * args[\depth].neg.midiratio });
+)
+
+
+t.value("a");
+t.value("aa");
+t.value("aaaa");
+t.value("aa(a(aa))");
+::
 
 method::globalSettings
 Dictionary of synth arguments for all synth functions.
@@ -374,7 +415,9 @@ definitionlist::
 ::
 
 method::operator
-Define a new operator. Operators take operands (signals) from the stack and combine them. A stack is defined by enclosing an expreaaion in curly brackets, like code::{ab*}::. If operands are left on the stack, they can becombined with the result by subsequent operators, like code::{abc+*}::.
+Define a new operator. Operators take operands (signals) from the stack and combine them. A stack is defined by enclosing an expreaaion in curly brackets, like code::{ab*}::. If operands are left on the stack, they can be combined with the result by subsequent operators, like code::{abc+*}::.
+
+warning::You have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control or code::controls[\env]:: to envelope it. strong::See above:: under link::#-filter::::
 
 argument::name
 The letter which represents the synth def
@@ -388,9 +431,13 @@ The number of operands (e.g. binary, or ternary).
 code::
 t = Steno.new;
 t.quelle(\a, { SinOsc.ar(Rand(0.9, 1.1) * 440) * 0.2 });
-t.quelle(\b, { LFPulse.ar(Rand(1, 3), 0, LFNoise0.kr(1).exprange(0.1, 0.6)) });
+t.quelle(\b, { LFPulse.kr(Rand(1, 3), 0, LFNoise0.kr(1).exprange(0.1, 0.6)) });
 t.operator('*', { |x, y| x * y }, 2);
 t.("{ab*}");
+
+// gating the output, if signal doesn't end by itself
+t.operator('*', { |x, y, controls| x * y  + WhiteNoise.ar(controls[\env] * 0.01)}, 2);
+t.("aaaa");
 ::
 
 method::variables
