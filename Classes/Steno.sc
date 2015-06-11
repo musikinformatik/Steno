@@ -380,7 +380,9 @@ Steno {
 	}
 
 	setter { |name ... keyValuePairs|
-		keyValuePairs[0, 2 ..] = keyValuePairs[0, 2 ..].collect { |val| val.reference }; // signals setting to be infective
+		forBy(1, keyValuePairs.lastIndex, 2, { |i|
+			keyValuePairs[i] = keyValuePairs[i].reference
+		});
 		this.set(name, *keyValuePairs);
 		// dummy synth
 		this.addSynthDef(name, { FreeSelf.kr(\gate.kr(1) < 1) }, true, false);

@@ -169,7 +169,7 @@ Ndef(\x, { MouseX.kr(0.1, 10, 1) });
 t.set(\b, \modrate, Ndef(\x));
 ::
 
-note::when the value is a function, it is called for each synth, and controls are passed in, as to allow arguments to depend on the graph::
+note::when the value is a function, it is called for each synth, and controls are passed in as a dictionary, as to allow arguments to depend on the graph.::
 
 code::
 (
@@ -185,6 +185,23 @@ t.value("aaaa");
 t.value("aa(a(aa))");
 ::
 
+note::If the value is a link::Classes/Ref:: (containing the value), the setting spills over into the subsequent and deeper nested synths (not to the next level up). This allows to uses synths to set parameters for other synths.::
+
+code::
+(
+t = Steno.new;
+t.quelle(\a, { Blip.ar(\freq.kr(20), 304) * 0.1 });
+t.quelle(\m, { 0.0 }); // dummy
+t.set(\a, \freq, 10); // Ref is written as a tick: `
+t.set(\m, \freq, `{ exprand(3, 70) }); // Ref is written as a tick: `
+)
+
+
+t.value("a");
+t.value("amama");
+::
+
+A short form is the method link::#-setter::, which generates a dummy synth with referenced settings.
 
 Special values are:
 table::
@@ -208,16 +225,13 @@ argument::... keyValuePairs
 Any number of parmeters and values. Values can be anything that can be converted to a synth argument.
 
 
-method::settings
-Dictionary of synth arguments for each synth function. Each set of arguments is a dictionary.
-
 method::setGlobal
 Dictionary of synth arguments for all synth functions (for Special values, see link::#-set::).
 
 code::
 t = Steno.new;
 t.setGlobal(\fadeTime, 2.0);
-t.globalSettings; // settings are a global dictionary
+t.settings.globalSettings; // settings are a global dictionary
 ::
 
 argument::... keyValuePairs
@@ -239,8 +253,18 @@ t.value("aaaa");
 t.value("aa(a(aa))");
 ::
 
-method::globalSettings
-Dictionary of synth arguments for all synth functions.
+method::settings
+Instance of class teletype::StenoSettings::, which provides different levels of synth arguments for all synth functions:
+
+table::
+##globalSettings || parameters applied to each synth in the graph
+##synthSettings || parameters applied only to the synths that have a given name
+::
+
+If the value is a link::Classes/Function:: (or anything that responds to the message teletype::value::), it is called for each synth, passing in the following informations as a dictionary: synthIndex (the count for each synth), index (the count for each type of synth), depth (the current nesting depth), and the token (name of the synth).
+
+
+The synthSettings have a special feature: if the value is a link::Classes/Ref:: (containing the value), the setting spills over into the subsequent and deeper nested synths (not to the next level up). This allows to uses synths to set parameters for other synths.
 
 method::numChannels
 Set the number of channels of the system - if running, synths defs are rebuilt and synths are restarted. If expand is true, the functions will multichannel expand.
@@ -440,6 +464,26 @@ t.operator('*', { |x, y, controls| x * y  + WhiteNoise.ar(controls[\env] * 0.01)
 t.("aaaa");
 ::
 
+method::setter
+A convenience method that generates a dummy synth with a setting that spills over to subsequent synths (see comment at link::#-set::).
+
+code::
+t = Steno.new;
+t.quelle(\n, { Dust.ar(\density.kr(1000) ! 2, 0.1) });
+t.filter(\f, { |in| BPF.ar(in * 10, \freq.kr(600), \rq.kr(0.1)) });
+t.setter(\u, \freq, { exprand(4000, 10000) });
+t.setter(\a, \freq, { exprand(400, 1000) });
+t.setter(\i, \density, { exprand(4, 20) });
+t.set(\z, \rq, 0.05);
+t.value("nf nf nf");
+t.value("nuf naf nuf");
+t.value("inuf inaf inuf");
+::
+
+note::
+as the synths are kept running, in fact this doesn't work as well as it should. We'd need to reset the synth parameters to make them forget the values that have been passed in.
+::
+
 method::variables
 Returns a dictionary of variables, if defined.
 
@@ -453,8 +497,8 @@ Generate new SynthDefs and restart all synths.
 method::bus
 The output bus.
 
-method::busses
-An array of busses used internally for signal routing
+method::busIndices
+An array of contiguous bus indices used internally for signal routing
 
 method::monitor
 Returns the monitor synth which maps the last output to the output bus (default: 0).
