@@ -6,7 +6,7 @@ todo: import sets from the web
 Steno {
 
 	var <numChannels, <expand, <maxBracketDepth, <server, <bus;
-	var <>quant, <settings, <globalSettings;
+	var <>quant, <settings;
 	var <encyclopedia, <operators;
 	var <monitor, <diff;
 	var <busIndices, <synthList, <argList, <variables;
@@ -32,10 +32,9 @@ Steno {
 	init {
 		synthList = [];
 		argList = [];
-		settings = ();
-		globalSettings = ();
 		variables = ();
 		operators = ();
+		settings = StenoSettings.new;
 		this.initBusses;
 		this.initDiff;
 		this.initSynthDefs;
@@ -83,21 +82,17 @@ Steno {
 	}
 
 	set { |name ... keyValuePairs|
-		var setting, defName;
-		name = name.asSymbol;
-		settings[name] = (setting = settings[name] ?? ());
-		setting.putPairs(keyValuePairs);
-		defName = this.prefix(name);
-		synthList.do { |synth, i|
-			if(defName == synth.defName) {
-				synth.set(*keyValuePairs)
-			}
-		};
+		this.sched {
+			settings.set(name, keyValuePairs);
+			this.eval(cmdLine);
+		}
 	}
 
 	setGlobal { |... keyValuePairs|
-		globalSettings.putPairs(keyValuePairs);
-		synthList.do { |synth| synth.set(*keyValuePairs) };
+		this.sched {
+			settings.setGlobal(keyValuePairs);
+			this.eval(cmdLine);
+		}
 	}
 
 	numChannels_ { |n|
@@ -156,33 +151,39 @@ Steno {
 
 	value { |string|
 		var processed;
-		if(string.isNil) {
-			this.resendSynths;
-		} {
-			processed = string;
-			processed !? { processed = processed.stenoStripLineComments };
-			if(server.serverRunning.not) { "Server (%) not running.".format(server.name).warn; ^this };
-			if(preProcess and: { preProcessor.notNil }) { processed = preProcessor.value(processed, this) };
-			string !? { rawCmdLine = string };  // keep unprocessed cmdLine
-			string = processed;
-
-			cmdLine = string;
-			this.sched({
-				server.openBundle;
-				protect {
-					if(string[0] == $!) {
-						this.freeAll;
-						string = string.drop(1);
-					};
-					if(verbosity > 0) { string.postcs };
-					diff.value(string)
-					//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
-					// if we use this one, we should use events instead of synths. then alsoprevTokens needs to be changed.
-				} {
-					server.closeBundle(server.latency);
-				}
-			})
+		this.sched {
+			if(string.isNil) {
+				this.resendSynths;
+			} {
+				processed = string;
+				processed !? { processed = processed.stenoStripLineComments };
+				if(server.serverRunning.not) { "Server (%) not running.".format(server.name).warn; ^this };
+				if(preProcess and: { preProcessor.notNil }) { processed = preProcessor.value(processed, this) };
+				string !? { rawCmdLine = string };  // keep unprocessed cmdLine
+				this.eval(processed)
+			}
 		}
+	}
+
+
+	eval { |string|
+		string = string ? "";
+		cmdLine = string;
+
+		server.openBundle;
+		protect {
+			if(string[0] == $!) {
+				this.freeAll;
+				string = string.drop(1);
+			};
+			if(verbosity > 0) { string.postcs };
+			diff.value(string)
+			//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
+			// if we use this one, we should use events instead of synths. then alsoprevTokens needs to be changed.
+		} {
+			server.closeBundle(server.latency);
+		}
+
 	}
 
 	prevTokens {
@@ -191,18 +192,17 @@ Steno {
 
 	resendSynths { |names| // names are symbols
 		// we use the one-to-one equivalence of synths and tokens
-		this.sched({
-			this.prevTokens.do { |token, i|
-				var newSynth, args;
-				if(names.isNil or: { names.includes(token) }) {
-					args = argList.at(i);
-					newSynth = this.newSynth(token, i, args);
-					if(verbosity > 1) { ("replaced synth" + token).postln };
-					synthList.at(i).release;
-					synthList.put(i, newSynth);
-				}
+		this.prevTokens.do { |token, i|
+			var newSynth, args;
+			if(names.isNil or: { names.includes(token) }) {
+				args = argList.at(i);
+				newSynth = this.newSynth(token, i, args);
+				if(verbosity > 1) { ("replaced synth" + token).postln };
+				synthList.at(i).release;
+				synthList.put(i, newSynth);
 			}
-		})
+		}
+
 	}
 
 
@@ -241,6 +241,7 @@ Steno {
 			var in, out, dryIn, token, arity;
 			token = this.removePrefix(synthList.at(i).defName);
 			header.postf(token);
+			args = args.keep(-8); // keep the last 4 pairs which are the ones that were added by SynthStack
 
 			if(args.isEmpty.not) {
 				in = findBus.(args[1]);
@@ -378,6 +379,13 @@ Steno {
 		operators[name.asSymbol] = arity;
 	}
 
+	setter { |name ... keyValuePairs|
+		keyValuePairs[0, 2 ..] = keyValuePairs[0, 2 ..].collect { |val| val.reference }; // signals setting to be infective
+		this.set(name, *keyValuePairs);
+		// dummy synth
+		this.addSynthDef(name, { FreeSelf.kr(\gate.kr(1) < 1) }, true, false);
+	}
+
 
 	declareVariables { |names|
 		names.do { |name|
@@ -439,11 +447,11 @@ Steno {
 		// begin serial: dry = in
 		/*
 		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
-			var input = In.ar(in, numChannels); // dryIn: bus outside parenthesis
-			var oldSignal = In.ar(out, numChannels);
-			var output = XFade2.ar(input, through * oldSignal, mix * 2 - 1);
-			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
-			XOut.ar(out, EnvGate.new, output);
+		var input = In.ar(in, numChannels); // dryIn: bus outside parenthesis
+		var oldSignal = In.ar(out, numChannels);
+		var output = XFade2.ar(input, through * oldSignal, mix * 2 - 1);
+		ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
+		XOut.ar(out, EnvGate.new, output);
 		}, force:true);
 		*/
 
@@ -509,7 +517,7 @@ Steno {
 	initDiff {
 		diff = DiffString(
 			insertFunc: { |token, i|
-				var args = this.calcNextArguments(token, i);
+				var args = this.calcNextArguments(token);
 				var synth = this.newSynth(token, i, args);
 				synthList = synthList.insert(i, synth);
 				argList = argList.insert(i, args);
@@ -527,7 +535,7 @@ Steno {
 				if(i >= synthList.size) {
 					"swapFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
-					args = this.calcNextArguments(token, i);
+					args = this.calcNextArguments(token);
 					synthList.at(i).release;
 					synth = this.newSynth(token, i, args);
 					synthList.put(i, synth);
@@ -539,7 +547,7 @@ Steno {
 				if(i >= synthList.size) {
 					"keepFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
-					args = this.calcNextArguments(token, i);
+					args = this.calcNextArguments(token);
 					synthList.at(i).set(*args);
 					argList.put(i, args);
 				};
@@ -567,7 +575,7 @@ Steno {
 				clock.nextTimeOnGrid(quant),
 				{ func.value; nil }
 			)
-		};
+		}
 	}
 
 	///////////////////////////////////
@@ -593,24 +601,25 @@ Steno {
 
 	initArguments {
 		argumentStack = StenoStack(busIndices);
+		settings.startGraph;
 	}
 
-	calcNextArguments { |token, i|
-		var args, thisSetting, arity, controls;
+	calcNextArguments { |token|
+		var args, arity, controls;
 
 		token = token.asSymbol;
 		argumentStack ?? { this.initArguments };
-		controls = argumentStack.controls;
 
 		args = switch(token,
-			'(', { argumentStack.beginSerial },
-			')', { argumentStack.endSerial },
-			'[', { argumentStack.beginParallel },
-			']', { argumentStack.endParallel },
-			'{', { argumentStack.beginStack },
-			'}', { argumentStack.endStack },
+			'(', { settings.push; argumentStack.beginSerial; },
+			')', { settings.pop; argumentStack.endSerial; },
+			'[', { settings.push; argumentStack.beginParallel;  },
+			']', { settings.pop; argumentStack.endParallel;},
+			'{', { settings.push; argumentStack.beginStack; },
+			'}', { settings.pop; argumentStack.endStack; },
 			// default case
 			{
+				controls = argumentStack.controls;
 				arity = operators[token];
 
 				// escape operators that occur outside a stack context
@@ -630,15 +639,7 @@ Steno {
 		//"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
 		//"% args: %\n".postf(token, args);
 
-
-		thisSetting = globalSettings.copy ? ();
-		settings.at(token) !? { thisSetting.putAll(settings.at(token)).value(controls) };
-
-		// we allow functions in settings to expand dependent on current state
-		thisSetting.keysValuesDo { |key, val|
-			args = args.add(key).add(val.value(controls))
-		};
-
+		args = settings.calcNextArguments(token, controls) ++ args; // append the necessary args, so they can't be overridden
 		//"% args: %\n".postf(token, args);
 		^args
 

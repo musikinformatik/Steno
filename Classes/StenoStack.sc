@@ -4,7 +4,7 @@ StenoStack {
 	var argStack;
 
 	var dryReadIndex = 0, readIndex = 0, writeIndex = 0, through = 0, <argumentIndex;
-	var nestingDepth = 0, effectiveSynthIndex = 0;
+	var nestingDepth = 0;
 
 
 	*new { |busIndices|

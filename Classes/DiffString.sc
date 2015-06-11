@@ -66,12 +66,16 @@ DiffString {
 	}
 
 	prKeepAll { |tokens|
-		^tokens.collect { |token, i|
+		var res;
+		if(verbose) { "keepin all tokens".postln };
+		beginFunc.value;
+		res = tokens.collect { |token, i|
 			if(verbose) { postln("keeping" + token, i) };
 			if(testFunc.value(i, Char.tab, token, token)) {
 				keepFunc.value(token, i);
 			};
 		};
+		^if(returnFunc.notNil) { returnFunc.value(res) } { res }
 	}
 
 	// analyze the diff output to call an appropriate function for each change
