@@ -473,13 +473,15 @@ Steno {
 
 
 	addSynthDef { |name, func, update = true, updateSubgraph = false, force = false|
+		var def;
 		if(variables.at(name).notNil) { Error("The token '%' is declared as a variable already.".format(name)).throw };
 		if("()[]{}?".find(name.asString).notNil  and: { force.not }) {
 			Error("The token '%' cannot be overridden.".format(name)).throw
 		};
 		encyclopedia = encyclopedia ? ();
 		encyclopedia.put(name, func);
-		SynthDef(this.prefix(name), func).add;
+		def = SynthDef(this.prefix(name), func).add;
+		settings.addSynthDef(name, def);
 		if(update) {
 			fork {
 				server.sync;
