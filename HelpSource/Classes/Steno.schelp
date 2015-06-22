@@ -565,4 +565,26 @@ Pdef(\x, Pbind(\string, Prand(["a", "!afafafaf", "afgafg"], inf), \dur, Prand([1
 
 ::
 
+section::BNF for standard Steno
+
+teletype::
+
+
+<letter> is any printable letter
+<synth> ::== <letter>
+<op> ::== <letter>
+<exp> ::== { <exp> | <synth> | <ser> | <par> | <app> }
+<ser> ::== `(` <exp> `)`
+<par> ::== `[` <exp> `]`
+<app> ::== `{` <exp> { <op> } `}`
+
+
+::
+
+
+
+
+
+
+
 
