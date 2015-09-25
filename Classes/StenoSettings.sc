@@ -32,7 +32,7 @@ StenoSettings {
 			};
 		};
 		msgFuncs[name] = if(count > 0) {
-			"{ |controls, %| \n\t[%]\n}".format(a.drop(-2), b.drop(-2)).postln.interpret;
+			"{ |controls, %| \n\t[%]\n}".format(a.drop(-2), b.drop(-2)).interpret;
 		} { #[] };
 	}
 
