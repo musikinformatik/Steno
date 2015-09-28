@@ -362,10 +362,13 @@ Steno {
 			var inputs = { |i|
 				stenoSignal.filterInput(numChannels, i * numChannels);
 			} ! arity;
-			var outputs = func.value(*inputs.keep(arity).add(stenoSignal.controls)).asArray.keep(numChannels);
+			var outputs = func.value(*inputs.keep(arity).add(stenoSignal.controls));
 
-			stenoSignal.filterOutput(outputs, numChannels);
-			stenoSignal.writeToBus;
+			if(outputs.notNil) {
+				outputs = outputs.asArray.keep(numChannels);
+				stenoSignal.filterOutput(outputs, numChannels);
+				stenoSignal.writeToBus;
+			};
 
 			if(verbosity > 0) { ("new operator: \"%\" with % channels and arity %\n").postf(name, numChannels, arity) };
 		}, update, updateSubgraph);
