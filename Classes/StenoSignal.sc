@@ -94,14 +94,18 @@ StenoSignal {
 	filter { |func, multiChannelExpand, argNumChannels|
 		var inputSignal = this.filterInput;
 		var signal = this.valueUGenFunc(func, inputSignal, multiChannelExpand, argNumChannels);
-		this.filterOutput(signal, signal.size);
+		if(signal.notNil) {
+			this.filterOutput(signal, signal.size);
+		}
 	}
 
 	// unique quelle definition
 	quelle { |func, multiChannelExpand, argNumChannels|
 		var inputSignal = this.quelleInput;
 		var signal = this.valueUGenFunc(func, inputSignal, multiChannelExpand, argNumChannels);
-		this.quelleOutput(signal, signal.size);
+		if(signal.notNil) {
+			this.quelleOutput(signal, signal.size)
+		}
 	}
 
 	addOutput { |signal, offset = 0|
@@ -125,14 +129,18 @@ StenoSignal {
 	}
 
 	valueUGenFunc { |func, inputSignal, multiChannelExpand, argNumChannels|
+		var output, size;
 
-		var output = func.value(inputSignal, controls).asArray;
-		var size = output.size;
+		output = func.value(inputSignal, controls);
+		if(output.isNil) { ^nil };
+
+		output = output.asArray;
+		size = output.size;
 
 		if(multiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
 			output = ({ func.value(inputSignal, controls) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
 		};
-		if(output.isNil) { output = [0.0] };
+
 		output = output.collect { |x| if(x.rate !== \audio) { K2A.ar(x) } { x } };  // convert output rate if necessary
 		if(output.size > argNumChannels) {
 			// definitely limit number of channels.
