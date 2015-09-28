@@ -1,20 +1,15 @@
-/*
-todo: import sets from the web
-*/
-
 
 Steno {
 
 	var <numChannels, <expand, <maxBracketDepth, <server, <bus;
-	var <>quant, <settings, <globalSettings;
-	var <encyclopedia, <maxArity = 1;
+	var <>quant, <settings;
+	var <encyclopedia, <operators;
 	var <monitor, <diff;
-	var <busses, <synthList, <argList, <variables;
+	var <busIndices, <synthList, <argList, <variables;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
 
-	var dryReadIndex = 0, readIndex = 0, writeIndex = 0, through = 0, effectiveSynthIndex = 0, argumentIndex;
-	var bracketStack, argStack, tokenIndices;
+	var argumentStack;
 
 	classvar <>current;
 
@@ -33,9 +28,10 @@ Steno {
 	init {
 		synthList = [];
 		argList = [];
-		settings = ();
-		globalSettings = ();
 		variables = ();
+		operators = ();
+		settings = StenoSettings.new;
+		this.initBusses;
 		this.initDiff;
 		this.initSynthDefs;
 		this.rebuildSynthDefs;
@@ -44,8 +40,10 @@ Steno {
 	}
 
 	clear {
-		busses.do { |bus| if(bus.index.notNil) { bus.free } };
-		busses = nil;
+		busIndices !? {
+			server.audioBusAllocator.free(busIndices.first);
+			busIndices = nil;
+		};
 		variables.do { |bus| if(bus.index.notNil) { bus.free } };
 		variables = ();
 		this.freeAll;
@@ -80,36 +78,30 @@ Steno {
 	}
 
 	set { |name ... keyValuePairs|
-		var setting, defName;
-		name = name.asSymbol;
-		settings[name] = (setting = settings[name] ?? ());
-		setting.putPairs(keyValuePairs);
-		defName = this.prefix(name);
-		synthList.do { |synth, i|
-			if(defName == synth.defName) {
-				synth.set(*keyValuePairs)
-			}
-		};
+		this.sched {
+			settings.set(name, keyValuePairs);
+			this.eval(cmdLine);
+		}
 	}
 
 	setGlobal { |... keyValuePairs|
-		globalSettings.putPairs(keyValuePairs);
-		synthList.do { |synth| synth.set(*keyValuePairs) };
+		this.sched {
+			settings.setGlobal(keyValuePairs);
+			this.eval(cmdLine);
+		}
 	}
 
 	numChannels_ { |n|
-		numChannels = n;
-		this.rebuild;
+		if(n != numChannels) {
+			busIndices = nil;
+			numChannels = n;
+			this.rebuildGraph;
+		};
 	}
 
 	expand_ { |flag|
 		expand = flag;
-		this.rebuild;
-	}
-
-	maxArity_ { |n|
-		maxArity = n;
-		this.rebuild;
+		this.rebuildGraph;
 	}
 
 	bus_ { |argBus|
@@ -123,10 +115,20 @@ Steno {
 	rebuild {
 		fork {
 			this.initBusses;
-			this.initSynthDefs;
 			this.rebuildSynthDefs;
 			server.sync;
 			this.resendSynths;
+			this.startMonitor(restart: true);
+		}
+	}
+
+	rebuildGraph {
+		fork {
+			this.freeAll;
+			this.initBusses;
+			this.rebuildSynthDefs;
+			server.sync;
+			this.value(rawCmdLine);
 			this.startMonitor(restart: true);
 		}
 	}
@@ -145,32 +147,39 @@ Steno {
 
 	value { |string|
 		var processed;
-		if(string.isNil) {
-			this.resendSynths;
-		} {
-			processed = string;
-			processed !? { processed = processed.stenoStripLineComments };
-			if(server.serverRunning.not) { "Server (%) not running.".format(server.name).warn; ^this };
-			if(preProcess and: { preProcessor.notNil }) { processed = preProcessor.value(processed, this) };
-			string !? { rawCmdLine = string };  // keep unprocessed cmdLine
-			string = processed;
-
-			cmdLine = string;
-			this.sched({
-				server.openBundle;
-				protect {
-					if(string[0] == $!) {
-						this.freeAll;
-						string = string.drop(1);
-					};
-					if(verbosity > 0) { string.postcs };
-					this.initArguments; // quick bandaid for an init bug.
-					diff.value(string)
-				} {
-					server.closeBundle(server.latency);
-				}
-			})
+		this.sched {
+			if(string.isNil) {
+				this.resendSynths;
+			} {
+				processed = string;
+				processed !? { processed = processed.stenoStripLineComments };
+				if(server.serverRunning.not) { "Server (%) not running.".format(server.name).warn; ^this };
+				if(preProcess and: { preProcessor.notNil }) { processed = preProcessor.value(processed, this) };
+				string !? { rawCmdLine = string };  // keep unprocessed cmdLine
+				this.eval(processed)
+			}
 		}
+	}
+
+
+	eval { |string|
+		string = string ? "";
+		cmdLine = string;
+
+		server.openBundle;
+		protect {
+			if(string[0] == $!) {
+				this.freeAll;
+				string = string.drop(1);
+			};
+			if(verbosity > 0) { string.postcs };
+			diff.value(string)
+			//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
+			// if we use this one, we should use events instead of synths. then alsoprevTokens needs to be changed.
+		} {
+			server.closeBundle(server.latency);
+		}
+
 	}
 
 	prevTokens {
@@ -179,18 +188,17 @@ Steno {
 
 	resendSynths { |names| // names are symbols
 		// we use the one-to-one equivalence of synths and tokens
-		this.sched({
-			this.prevTokens.do { |token, i|
-				var newSynth, args;
-				if(names.isNil or: { names.includes(token) }) {
-					args = argList.at(i);
-					newSynth = this.newSynth(token, i, args);
-					if(verbosity > 1) { ("replaced synth" + token).postln };
-					synthList.at(i).release;
-					synthList.put(i, newSynth);
-				}
+		this.prevTokens.do { |token, i|
+			var newSynth, args;
+			if(names.isNil or: { names.includes(token) }) {
+				args = argList.at(i);
+				newSynth = this.newSynth(token, i, args);
+				if(verbosity > 1) { ("replaced synth" + token).postln };
+				synthList.at(i).release;
+				synthList.put(i, newSynth);
 			}
-		})
+		}
+
 	}
 
 
@@ -200,40 +208,53 @@ Steno {
 			if(restart) { monitor.release } { ^this }
 		};
 		monitor = Synth(this.prefix(\monitor),
-			[\out, bus ? 0, \in, busses.first, \amp, 0.1],
+			[\out, bus ? 0, \in, busIndices.first, \amp, 0.1],
 			addAction:\addAfter
 		).register;
 
 	}
 
 	initBusses {
-		var n = numChannels * maxArity;
-		if(busses.isNil or: { busses.first.numChannels != n }) {
-			busses = {
-				var bus = Bus.audio(Server.default, n);
-				if(bus.isNil) { "not enough busses available!".warn };
-				bus
-			} ! maxBracketDepth
-		};
+		var n;
+		if(busIndices.isNil) {
+			n = numChannels * maxBracketDepth;
+			busIndices = server.audioBusAllocator.alloc(n);
+			if(busIndices.isNil) {
+				"not enough busses available! Please reboot the server"
+				"or increase the number of audio bus channels in ServerOptions".throw
+			};
+
+			busIndices = busIndices + (0, numChannels .. n);
+		}
 	}
 	//////////////////// getting information about the resulting synth graph ////////////
 
 	dumpStructure { |postDryIn = false|
 		var header = String.fill(maxBracketDepth + 4, $-);
-		var findBus = { |bus| /*busses.indexOf(bus)*/ bus };
+		var findBus = { |bus| busIndices.indexOf(bus) };
 		header = [header, "  %  ", header, "\n"].join;
 		argList.do { |args, i|
-			var in, out, dryIn;
-			header.postf(this.removePrefix(synthList.at(i).defName));
+			var in, out, dryIn, token, arity;
+			token = this.removePrefix(synthList.at(i).defName);
+			header.postf(token);
+			args = args.keep(-8); // keep the last 4 pairs which are the ones that were added by SynthStack
 
 			if(args.isEmpty.not) {
 				in = findBus.(args[1]);
 				out = findBus.(args[3]);
 				dryIn = findBus.(args[5]);
 
-				in.do { "   ".post }; in.postln;
+				in.do { "   ".post }; in.post;
+				arity = operators[token];
+				if(arity.notNil) {
+					(arity - 2).do { "___".post };
+					"__".post;
+					(in + arity - 1).post;
+				};
+				"\n".post;
 				if(postDryIn) { dryIn.do { "   ".post }; "(%)\n".postf(dryIn) };
 				out.do { "   ".post }; out.postln;
+
 			}
 		}
 	}
@@ -248,19 +269,19 @@ Steno {
 		window.background = Color.black;
 		window.onClose = { run = false };
 		window.drawFunc = {
-			var prevNodes = Array.newClear(busses.size);
+			var prevNodes = Array.newClear(busIndices.size);
 			synthList.do { |synth, i|
 				var nodeSize = 20;
 				var args = argList.at(i);
 				var name = this.removePrefix(synth.defName);
 				var mul = Point(
-					window.bounds.width - (nodeSize * 2) / busses.size,
+					window.bounds.width - (nodeSize * 2) / busIndices.size,
 					window.bounds.height - (nodeSize * 2) / synthList.size
 				);
 				if(args.isEmpty.not and: { name != ')' }) {
-					in = busses.indexOf(args[1]);
-					//in = busses.indexOf(args[5]);
-					out = busses.indexOf(args[3]);
+					in = busIndices.indexOf(args[1]);
+					//in = busIndices.indexOf(args[5]);
+					out = busIndices.indexOf(args[3]);
 				} {
 					out = out ? 0;
 					in = in ? in;
@@ -282,125 +303,91 @@ Steno {
 		^window.front;
 	}
 
-	dotStructure { |title|
-		^this.cmdLine.stenoDotStructure(title, this.maxBracketDepth, variables.keys)
+	dotStructure { |title, attributes, labelAttributes|
+		attributes = attributes ?? { "rankdir=LR;\nfontname=Courier;\nlabel=\"\n\n%\"".format(cmdLine) };
+		labelAttributes = labelAttributes ?? { "fontname=Courier" };
+		^this.cmdLine.stenoDotStructure(title ? cmdLine, attributes, variables.keys, operators, labelAttributes)
 	}
 
 
 	///////////////// wrappers for UGen functions ///////////////////////
 
+	// external interface
+
 	filter { |name, func, multiChannelExpand, update = true, numChannels|
-		multiChannelExpand = multiChannelExpand ? expand; // expand to full channels either when specified for this synth or global default
-		numChannels = min(numChannels ? this.numChannels, this.numChannels);
-
-		this.addSynthDef(name, { |out, in, dryIn, through = 0, mix = 1, synthIndex = 0, nestingDepth = 0|
-			var output, drySignal, oldSignal, filterInput, filterOutput, detectSignal, size;
-			var gate = \gate.kr(1), fadeTime = \fadeTime.kr(0.02), gateHappened;
-			var env = EnvGen.kr(Env.asr(0, 1, fadeTime), gate);
-			var controls = (index: synthIndex, depth: nestingDepth, mix: mix, gate: gate, numChannels: numChannels, through: through, env: env);
-
-			filterInput = In.ar(in, numChannels) * env;   // gate the input, not the output
-			oldSignal = In.ar(out, numChannels);          // previous signal on bus
-			drySignal = In.ar(dryIn, numChannels);        // dry signal (may come from another bus, but mostly is same as in)
-
-
-			filterOutput = this.valueUGenFunc(func, filterInput, controls, multiChannelExpand, numChannels);
-			detectSignal = (gate * 100) + LeakDC.ar(filterOutput.asArray.sum); // free the synth only if gate is 0.
-			DetectSilence.ar(detectSignal, time: 0.01, doneAction:2); // free the synth when gate = 0 and fx output is silent
-			output = XFade2.ar(drySignal, filterOutput, mix * 2 - 1); // mix in filter output to dry signal.
-			output = output + (oldSignal * max(through, 1 - env)); // when the gate is switched off (released), let old input through
-			ReplaceOut.ar(out, output);
-			// remove hanging notes if necessary:
-			gateHappened = \gate.kr(1) <= 0;
-			FreeSelf.kr(TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30))) + (gateHappened * \steno_unhang.tr(0)));
-			if(verbosity > 0) { ("new filter synth def: \"%\" with % channels\n").postf(name, output.size) };
+		this.addSynthDef(name, {
+			var stenoSignal, signalNumChannels;
+			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
+			stenoSignal = StenoSignal(signalNumChannels);
+			stenoSignal.filter(func, multiChannelExpand ? expand, signalNumChannels);
+			stenoSignal.writeToBus;
+			if(verbosity > 0) { ("new filter: \"%\" with % channels\n").postf(name, signalNumChannels) };
 		}, update);
 	}
 
 	quelle { |name, func, multiChannelExpand, update = true, numChannels|
 
-		multiChannelExpand = multiChannelExpand ? expand;
-		numChannels = min(numChannels ? this.numChannels, this.numChannels);
+		this.addSynthDef(name, {
+			var stenoSignal, signalNumChannels;
+			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
+			stenoSignal = StenoSignal(signalNumChannels);
+			stenoSignal.quelle(func, multiChannelExpand ? expand, signalNumChannels);
+			stenoSignal.writeToBus;
+			if(verbosity > 0) { ("new quelle: \"%\" with % channels\n").postf(name, signalNumChannels) };
+		}, update);
+	}
 
-		this.addSynthDef(name, { |out, in, mix = 1, synthIndex = 0, nestingDepth = 0|
-			var gate = \gate.kr(1);
-			var env = EnvGate(1.0, gate, doneAction:2);
-			var input = In.ar(in, numChannels);
-			var oldSignal = In.ar(out, numChannels);          // previous signal on bus
-			var controls = (index: synthIndex, depth: nestingDepth, env: env, mix: mix, gate: gate, numChannels: numChannels);
+	// TODO: shapes etc.
+	struktur { |name, func, multiChannelExpand, update = true, numChannels|
 
-			var output = this.valueUGenFunc(func, input, controls, multiChannelExpand, numChannels);
-
-			output = XFade2.ar(oldSignal, output + oldSignal, (mix * env) * 2 - 1);
-			ReplaceOut.ar(out, output); // can't use Out here, because in can be different than out
-			if(verbosity > 0) { ("new source synth def: \"%\" with % channels\n").postf(name, output.size) };
+		this.addSynthDef(name, {
+			var stenoSignal, signalNumChannels;
+			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
+			stenoSignal = StenoSignal(signalNumChannels, multiChannelExpand);
+			func.value(stenoSignal.input, stenoSignal); // pass the signal object here, so func can use it
+			stenoSignal.writeToBus;
+			if(verbosity > 0) { ("new struktur: \"%\" with % channels\n").postf(name, signalNumChannels) };
 		}, update);
 	}
 
 	operator { |name, func, arity = 2, multiChannelExpand, update = true|
-		if(arity > maxArity) { Error("this operator has too many arguments. Increase maxArity if you need more").throw };
-		"Building operator '%' with an arity of %\n".postf(name, arity);
-		this.filter(name, { |input, controls|
-			var args = input.postcs.clump(numChannels).keep(arity).add(controls);
-			func.valueArray(args)
-		}, multiChannelExpand, update, numChannels * arity);
+
+		var updateSubgraph = this.prevTokens.includes(name) and: { operators[name] != arity };
+
+		this.addSynthDef(name, {
+			var numChannels = this.numChannels;
+			var totalNumChannels = numChannels * arity;
+
+			var stenoSignal = StenoSignal(totalNumChannels);
+			var inputs = { |i|
+				stenoSignal.filterInput(numChannels, i * numChannels);
+			} ! arity;
+			var outputs = func.value(*inputs.keep(arity).add(stenoSignal.controls)).asArray.keep(numChannels);
+
+			stenoSignal.filterOutput(outputs, numChannels);
+			stenoSignal.writeToBus;
+
+			if(verbosity > 0) { ("new operator: \"%\" with % channels and arity %\n").postf(name, numChannels, arity) };
+		}, update, updateSubgraph);
+
+		operators[name.asSymbol] = arity;
 	}
 
-	filterEnvir { |name, func, multiChannelExpand, update = true, shapes| // multiChannelExpand not yet supported.
-		var sizes, names, numChannels, envirFunc;
-		#names, sizes = shapes.flop;
-		numChannels = sizes.sum;
-		if(numChannels > this.numChannels) { "Too many channels defined in shape".warn; ^this };
-
-		envirFunc = { |in, controls|
-			var input, envir, result, signals, allInputs;
-
-			envir = ();
-			allInputs = in.keep(numChannels).clumps(sizes);
-			allInputs.do { |x, i|
-				envir.put(names[i], x)
-			};
-			result = func.value(envir, controls);
-			if(result.isKindOf(Dictionary).not) {
-				"UGen function should return a dictionary with signals".error;
-			};
-			result = envir.putAll(result);
-			names.do { |name, i|
-				var signal = result[name];
-				var oldSignal = allInputs[i];
-				var newSignal = oldSignal.collect { |old, j|
-					var new = signal.asArray[j];
-					if(new.isNil) { old } { new }
-				};
-				signals = signals.addAll(newSignal)
-			};
-			signals
-		};
-		//it would be probably much better if we had a more selective choice for filter/quelle
-		this.filter(name, envirFunc, false, update, numChannels)
+	setter { |name ... keyValuePairs|
+		forBy(1, keyValuePairs.lastIndex, 2, { |i|
+			keyValuePairs[i] = keyValuePairs[i].reference
+		});
+		this.set(name, *keyValuePairs);
+		// dummy synth
+		this.addSynthDef(name, { FreeSelf.kr(\gate.kr(1) < 1) }, true, false);
 	}
 
-	valueUGenFunc { |func, input, controls, multiChannelExpand, argNumChannels|
-		var output = func.value(input.asArray, controls).asArray;
-		var size = output.size;
-
-		if(multiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
-			output = ({ func.value(input.asArray, controls) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
-		};
-		if(output.isNil) { output = [0.0] };
-		output = output.collect { |x| if(x.rate !== \audio) { K2A.ar(x) } { x } };  // convert output rate if necessary
-		if(output.size > argNumChannels) {
-			output = SplayAz.ar(argNumChannels, output);  // definitely limit number of channels. // here we could also just keep n channels instead?
-			if(verbosity > 0) { "Mapped synth def function channels from % to % channels\n".postf(output.size, argNumChannels) };
-		};
-		^output
-	}
 
 	declareVariables { |names|
 		names.do { |name|
 			name = name.asSymbol;
 			if(variables[name].isNil) {
-
+				"new variable as ".post;
 				this.filter(name, { |input, controls|
 					var bus = Bus.audio(server, numChannels);
 					var in = XFade2.ar(In.ar(bus, numChannels), InFeedback.ar(bus, numChannels), \feedback.kr.linlin(0, 1, -1, 1));
@@ -423,6 +410,7 @@ Steno {
 	// building synth defs
 
 	initSynthDefs {
+		var routingFunction, dummyOpeningFunction;
 		// we always go through a limiter here.
 		this.addSynthDef(\monitor, { |out, in, amp = 0.1|
 			Out.ar(out,
@@ -432,69 +420,72 @@ Steno {
 					0.1
 				)
 			)
-		});
+		}, force:true);
 
-		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
-			var feedbackIn = InFeedback.ar(in, numChannels); // out: bus inside parenthesis
-			//DelayL.ar(InFeedback.ar(in, numChannels), Rand(0.1), 0.1);
-			var drySignal = In.ar(dryIn, numChannels); // dryIn: bus outside parenthesis
-			var oldSignal = In.ar(out, numChannels);
-			var output = XFade2.ar(drySignal, feedbackIn + (through * oldSignal), mix * 2 - 1);
-			XOut.ar(out, EnvGate.new, output);
-			// here is a problem, actually we can't reuse a bus that is used for feedback (unless: we want to mix in several feedbacks).
+		// same for all closing brackets
+		// mix controls balance between serial bus result and outside bus
+		routingFunction = { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
+			var input = In.ar(in, numChannels); // in: result of serial synths
+			var oldSignal = In.ar(out, numChannels); // the old signal on the bus, mixed in by through
+			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
+			var signalOnMixBus = input + (through * oldSignal);
+			var output = XFade2.ar(inputOutside, signalOnMixBus, mix * 2 - 1);
 			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
-		});
+			XOut.ar(out, EnvGate.new, output); // overwrite the out channel with the new mix
+		};
 
-		this.addSynthDef(')', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var drySignal = In.ar(in, numChannels); // out: bus inside parenthesis
-			var oldSignal = In.ar(out, numChannels);
-			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
-			var output = XFade2.ar(inputOutside, drySignal + (through * oldSignal), mix * 2 - 1);
-			XOut.ar(out, EnvGate.new, output)
-		});
-
-		this.addSynthDef('[', { |in, out|
+		// nothing to do, just clean up bus, to be sure.
+		dummyOpeningFunction = { |in, out|
+			ReplaceOut.ar(out, Silent.ar(numChannels)); // umbrella
 			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
-		});
+		};
 
-		this.addSynthDef(']', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var input = In.ar(in, numChannels);  // in: bus outside parenthesis
-			var oldSignal = In.ar(out, numChannels);
-			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
-			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
-			XOut.ar(out, EnvGate.new, output);
-			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up bus: overwrite channels with zero, so it can be reused further down
-		});
+		// begin serial: dry = in
+		/*
+		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
+		var input = In.ar(in, numChannels); // dryIn: bus outside parenthesis
+		var oldSignal = In.ar(out, numChannels);
+		var output = XFade2.ar(input, through * oldSignal, mix * 2 - 1);
+		ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
+		XOut.ar(out, EnvGate.new, output);
+		}, force:true);
+		*/
 
-		// a dumm<
-		this.addSynthDef('{', { |in, out|
-			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
-		});
 
-		// almost the same as ']', just sends more channels
-		this.addSynthDef('}', { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var n = numChannels * maxArity;
-			var input = In.ar(in, n);  // in: bus outside parenthesis
-			var oldSignal = In.ar(out, n);
-			var inputOutside = In.ar(dryIn, n);  // dryIn: bus outside parenthesis
-			var output = XFade2.ar(inputOutside, input + (through * oldSignal), mix * 2 - 1);
-			XOut.ar(out, EnvGate.new, output);
-			ReplaceOut.ar(in, Silent.ar(n)); // clean up bus: overwrite channels with zero, so it can be reused further down
-		});
+		this.addSynthDef('(', routingFunction, force:true);
 
-		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }); // if not found use this.
+		this.addSynthDef('[', dummyOpeningFunction, force:true);
+		this.addSynthDef('{', dummyOpeningFunction, force:true);
+
+		this.addSynthDef(')', routingFunction, force:true);
+		this.addSynthDef(']', routingFunction, force:true);
+		this.addSynthDef('}', routingFunction, force:true);
+
+		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }, force:true); // if not found use this.
 
 	}
 
 
-	addSynthDef { |name, func, update = true|
+	addSynthDef { |name, func, update = true, updateSubgraph = false, force = false|
+		var def;
 		if(variables.at(name).notNil) { Error("The token '%' is declared as a variable already.".format(name)).throw };
+		if("()[]{}?".find(name.asString).notNil  and: { force.not }) {
+			Error("The token '%' cannot be overridden.".format(name)).throw
+		};
 		encyclopedia = encyclopedia ? ();
 		encyclopedia.put(name, func);
-		SynthDef(this.prefix(name), func).add;
+		def = SynthDef(this.prefix(name), func).add;
+		settings.addSynthDef(name, def);
 		if(update) {
-			fork { server.sync; this.resendSynths([name]) }
-		};
+			fork {
+				server.sync;
+				if(updateSubgraph) {
+					this.resendSynths // for now, just update all
+				} {
+					this.resendSynths([name])
+				}
+			}
+		}
 	}
 
 
@@ -524,7 +515,7 @@ Steno {
 	initDiff {
 		diff = DiffString(
 			insertFunc: { |token, i|
-				var args = this.calcNextArguments(token, i);
+				var args = this.calcNextArguments(token);
 				var synth = this.newSynth(token, i, args);
 				synthList = synthList.insert(i, synth);
 				argList = argList.insert(i, args);
@@ -542,7 +533,7 @@ Steno {
 				if(i >= synthList.size) {
 					"swapFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
-					args = this.calcNextArguments(token, i);
+					args = this.calcNextArguments(token);
 					synthList.at(i).release;
 					synth = this.newSynth(token, i, args);
 					synthList.put(i, synth);
@@ -554,7 +545,7 @@ Steno {
 				if(i >= synthList.size) {
 					"keepFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
-					args = this.calcNextArguments(token, i);
+					args = this.calcNextArguments(token);
 					synthList.at(i).set(*args);
 					argList.put(i, args);
 				};
@@ -567,7 +558,7 @@ Steno {
 			},
 			returnFunc: {
 				if(verbosity > 1) { this.dumpStructure };
-				this.initArguments; // just to make sure: sometimes it seems that beginFunc isn't called.
+				argumentStack = nil;
 			}
 		)
 	}
@@ -582,7 +573,7 @@ Steno {
 				clock.nextTimeOnGrid(quant),
 				{ func.value; nil }
 			)
-		};
+		}
 	}
 
 	///////////////////////////////////
@@ -591,7 +582,6 @@ Steno {
 
 	newSynth { |token, i, args|
 		var target = synthList[i - 1];
-		var setting;
 		token = token.asSymbol;
 		if(encyclopedia.at(token).isNil) { token = '?' }; // silent
 
@@ -608,143 +598,55 @@ Steno {
 	////////////////////////////////////////////////////////
 
 	initArguments {
-		readIndex = writeIndex = dryReadIndex = through = effectiveSynthIndex = 0;
-		argumentIndex = nil; // for nary-op functions
-		argStack = [];
-		bracketStack = [];
-		tokenIndices = ();
-		this.initBusses;
-
+		argumentStack = StenoStack(busIndices);
+		settings.startGraph;
 	}
 
-	calcNextArguments { |token, i|
-		var previousWriteIndex, args, thisSetting;
+	calcNextArguments { |token|
+		var args, arity, controls;
+
 		token = token.asSymbol;
-		switch(token,
-			'(', {
-				// save current args on stack
-				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
-				bracketStack = bracketStack.add(token);
+		argumentStack ?? { this.initArguments };
 
-				// args for this synth
-				args = this.getBusArgs(readIndex, writeIndex + 1, readIndex, through, argumentIndex);
-
-				// set args for subsequent synths
-				dryReadIndex = readIndex;
-				readIndex = writeIndex = writeIndex + 1;
-				through = 0.0;
-
-			},
-			')', {
-
-				// save current write index
-				previousWriteIndex = writeIndex;
-
-				// set args for subsequent synths
-				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
-				bracketStack.pop;
-
-				// args for this synth
-				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
-
-			},
-
-			'[', {
-				// save current args on stack
-				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
-				bracketStack = bracketStack.add(token);
-
-				// args for this synth
-				args = []; // nothing needed (dummy synth)
-
-				// set args for subsequent synths
-				dryReadIndex = readIndex;
-				readIndex = readIndex; // same same
-				writeIndex = writeIndex + 1;
-				through = 1.0;
-
-			},
-			']', {
-				// save current write index
-				previousWriteIndex = writeIndex;
-
-				// set args for subsequent synths
-				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
-				bracketStack.pop;
-
-				// args for this synth
-				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
-
-
-			},
-			// same as '[' just don't go one deeper in bracket depth (arguable + experimental)
-			'{', {
-				// save current args on stack
-				argStack = argStack.add([readIndex, writeIndex, readIndex, through, argumentIndex]);
-				//bracketStack = bracketStack.add(token);
-
-				// args for this synth
-				args = []; // nothing needed (dummy synth)
-
-				// set args for subsequent synths
-				dryReadIndex = readIndex;
-				readIndex = readIndex; // same same
-				writeIndex = writeIndex + 1;
-				through = 1.0;
-
-				// nary operators
-				argumentIndex = 0;
-
-			},
-			// same as ']' just no bracket stack pop (arguable + experimental)
-			'}', {
-				// save current write index
-				previousWriteIndex = writeIndex;
-
-				// set args for subsequent synths
-				#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
-				//bracketStack.pop;
-
-				// args for this synth
-				args = this.getBusArgs(previousWriteIndex, writeIndex, dryReadIndex, through, argumentIndex);
-
-			},
+		args = switch(token,
+			'(', { settings.push; argumentStack.beginSerial; },
+			')', { settings.pop; argumentStack.endSerial; },
+			'[', { settings.push; argumentStack.beginParallel;  },
+			']', { settings.pop; argumentStack.endParallel;},
+			'{', { settings.push; argumentStack.beginStack; },
+			'}', { settings.pop; argumentStack.endStack; },
 			// default case
 			{
+				controls = argumentStack.controls;
+				arity = operators[token];
 
-				if(tokenIndices[token].isNil) { tokenIndices[token] = 0 };
-
-				// args for this synth
-				args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, through, argumentIndex)
-				++ [\synthIndex, effectiveSynthIndex, \nestingDepth, bracketStack.size, \tokenIndex, tokenIndices[token]];
-
-				effectiveSynthIndex = effectiveSynthIndex + 1; // only count up for normal synths, not for brackets
-				tokenIndices[token] = tokenIndices[token] + 1;
-				if(argumentIndex.notNil) {
-						argumentIndex = argumentIndex + 1 % maxArity
-				};
+				// escape operators that occur outside a stack context
+				if(arity.notNil and: { argumentStack.inOperatorStack.not }) {
+					"Operator '%' used outside a stack. Better we ignore it.".format(token).warn;
+					token = '?';
+					argumentStack.pushLetter(token)
+				} {
+					if(arity.notNil) {
+						argumentStack.pushOperator(token, arity)
+					} {
+						argumentStack.pushLetter(token)
+					}
+				}
 			}
 		);
+		//"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
 		//"% args: %\n".postf(token, args);
 
-		thisSetting = globalSettings.copy ? ();
-		settings.at(token) !? { thisSetting.putAll(settings.at(token)) };
-		^args ++ thisSetting.asKeyValuePairs
+		args = settings.calcNextArguments(token, controls) ++ args; // append the necessary args, so they can't be overridden
+		//"% args: %\n".postf(token, args);
+		^args
 
-	}
-
-	// generate synth arguments for in-out-mapping
-
-	getBusArgs { |readIndex, writeIndex, dryReadIndex, through, argumentIndex = (0)|
-		var readBus = busses.clipAt(readIndex).index;
-		var writeBus = busses.clipAt(writeIndex).index;
-		var dryReadBus = busses.clipAt(dryReadIndex).index;
-		^[\in, readBus, \out, writeBus + (argumentIndex * numChannels), \dryIn, dryReadBus, \through, through]
 	}
 
 
 	*defaultPreProcessor {
 		^#{ |str, steno|
+
 			var newStr = str.class.new, doResend = false, currentClump = str.class.new, hasGap = false;
 
 			if(str.isNil) {
@@ -752,6 +654,12 @@ Steno {
 			} {
 				if(str[0] == $!) { doResend = true; str = str.drop(1); };
 				str = str.replace("\n", " ");
+			};
+
+			// strip trailing whitespace
+			if(str.notEmpty) {
+				while { str[0].isSpace } { str = str.drop(1) };
+				while { str[str.size - 1].isSpace } { str = str.drop(-1) };
 			};
 
 			// bring the string into regular form: if it has a gap on the top level ...
@@ -765,7 +673,7 @@ Steno {
 			str.doBrackets({ |char, i, scope, outerScope|
 				var fstr;
 				if("([".includes(char)) {
-					outerScope[\currentClump] = currentClump  ++ char;
+					outerScope[\currentClump] = currentClump ++ char;
 					currentClump = "";
 				} {
 					if(")]".includes(char)) {
@@ -777,7 +685,11 @@ Steno {
 						};
 						currentClump = outerScope[\currentClump] ++ currentClump ++ char;
 					} {
-						currentClump = currentClump ++ char;
+						if(char == $}) {
+							currentClump = currentClump.replace(" ", "") ++ char;
+						} {
+							currentClump = currentClump ++ char;
+						}
 					}
 				};
 			}, false, false); // todo: check if we can avoid double checking below
@@ -880,18 +792,21 @@ Steno {
 	// return dot file for graphviz little language
 	// we assume that syntax has already been checked.
 
-	stenoDotStructure { |title = "untitled", attributes = "", variableNames|
+	stenoDotStructure { |title = "untitled", attributes = "", variableNames, operators, labelAttributes = ""|
 		var labelString = "", graphString = "", variableLinks = ();
+		operators = operators.copy;
 		this.do { |char, i|
-			labelString = labelString ++ format("% [label=\"%\"];\n", i, char);
+			labelString = labelString ++ format("% [label=\"%\"; %];\n", i, char, labelAttributes);
 		};
+		labelString = labelString ++ format("% [label=\"%\"; %];\n", this.size, "out", labelAttributes);
 		this.doBrackets({ |token, i, scope, outerScope|
+			var arity = operators[token.asSymbol];
 			if("([{".includes(token)) {
 				if(outerScope.notNil) { // on opening a bracket: connect to previous
 					scope[\prevNode] = outerScope[\prevNode];
 				};
 			};
-			if("]}".includes(token).not) { // no need to link forward to next bracket
+			if("]".includes(token).not and: { arity.isNil }) { // no need to link forward to next bracket
 				// print link to previous
 				scope[\prevNode] !? {
 					graphString = graphString ++ "% -> %;\n".format(scope[\prevNode], i);
@@ -906,20 +821,30 @@ Steno {
 				// now we can move outside:
 				scope = outerScope;
 			};
-
-			// if serial, link to previous
-			// if parallel, link to top.
-
-			if(scope[\modus] == \parallel) {
+			if(arity.notNil) {
+				// print uplinks in operator stack graph
+				scope[\upLinks].keep(arity.neg).do { |x|
+					graphString = graphString ++ "% -> %;\n".format(x, i);
+				};
+				scope[\upLinks] = scope[\upLinks].drop(arity.neg);
+				scope[\prevNode] = i;
 				scope[\upLinks] = scope[\upLinks].add(i);
 			} {
-				scope[\prevNode] = i;
+
+				// if serial, link to previous
+				// if parallel, link to top.
+
+				switch(scope[\modus],
+					\parallel, { scope[\upLinks] = scope[\upLinks].add(i) },
+					\stack, { scope[\upLinks] = scope[\upLinks].add(i) },
+					{ scope[\prevNode] = i }
+				);
 			};
 
 			// switch modus
 			if(token == $() { scope[\modus] = \serial };
 			if(token == $[) { scope[\modus] = \parallel };
-			if(token == ${) { scope[\modus] = \parallel };
+			if(token == ${) { scope[\modus] = \stack };
 
 			scope // return new current scope for next iteration
 
@@ -932,13 +857,16 @@ Steno {
 					if(variableLinks.at(name).isNil) {
 						variableLinks.put(name, i) // define a new variable
 					} {
-						graphString = graphString ++ "% -> %;\n".format(variableLinks.at(name), i);// ERRROR HERE?
+						"found:".postln;
+						graphString = graphString ++ "% -> %;\n".format(variableLinks.at(name), i);
 					}
 				}
 			};
 		};
+		graphString = graphString ++ "% -> %;\n".format(this.size - 1, this.size);
+
 		// ^"digraph %\n{\n%\n%\n}\n}".format(title, attributes, labelString, graphString)
-		^"digraph %\n{\n%\n".format(title, attributes) ++ labelString ++ "\n" ++ graphString ++ "}\n}"
+		^"\n\ndigraph %\n{\n%\n".format("", attributes) ++ labelString ++ "\n" ++ graphString ++ "}\n}"
 	}
 
 
