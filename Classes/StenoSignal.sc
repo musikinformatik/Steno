@@ -2,7 +2,7 @@
 StenoSignal {
 	var <numChannels, <multiChannelExpand;
 	var <inBus, <outBus, <env, <gate, <fadeTime, <mix, <through, <dryIn;
-	var <synthIndex, <depth, <input, <controls;
+	var <synthIndex, <index, <depth, <input, <controls;
 	var outputSignals;
 
 	*new { |numChannels, multiChannelExpand = false|
@@ -22,11 +22,14 @@ StenoSignal {
 		through = \through.kr(0);
 		dryIn = \dryIn.kr(0);
 		synthIndex = \synthIndex.kr(0);
+		index = \index.kr(0);
 		depth = \nestingDepth.kr(0);
 		input = In.ar(inBus, numChannels).asArray;
 		outputSignals = Array.fill(numChannels, 0.0);
+		// see also StenoStack:updateControls
 		controls = (
-			index: synthIndex,
+			index: index,
+			synthIndex: synthIndex,
 			depth: depth,
 			mix: mix,
 			gate: gate,

@@ -69,10 +69,11 @@ StenoSettings {
 			}
 		};
 
+		thisSetting.putAll(controls);
 		thisSetting.parent = current;
 
 		^thisSetting.use {
-			msgFunc.valueEnvir(controls)
+			msgFunc.valueEnvir
 		}
 
 	}

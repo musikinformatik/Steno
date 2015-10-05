@@ -142,9 +142,12 @@ StenoStack {
 		// generate some extra information that is passed as arguments to the next synth
 		controls.use {
 			var tokenIndex = ~tokenIndices[token];
+			// ~index is the number of past usages of the same synth
 			~tokenIndices[token] = ~index = if(tokenIndex.isNil) { 0 } { tokenIndex + 1 };
 			~token = token;
+			// ~depth is the bracket nesting depth
 			~depth = nestingDepth;
+			// ~synthIndex is the number of synths (excluding special characters like brackets)
 			~synthIndex = ~synthIndex + 1; // only count up for normal synths, not for brackets
 		}
 	}
