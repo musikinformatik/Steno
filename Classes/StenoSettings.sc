@@ -69,7 +69,7 @@ StenoSettings {
 			}
 		};
 
-		thisSetting.putAll(controls);
+		controls !? { thisSetting.putAll(controls) };
 		thisSetting.parent = current;
 
 		^thisSetting.use {
