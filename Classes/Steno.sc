@@ -117,8 +117,10 @@ Steno {
 			this.initBusses;
 			this.rebuildSynthDefs;
 			server.sync;
-			this.resendSynths;
-			this.startMonitor(restart: true);
+			this.sched {
+				this.resendSynths;
+				this.startMonitor(restart: true);
+			}
 		}
 	}
 
@@ -482,10 +484,12 @@ Steno {
 		if(update) {
 			fork {
 				server.sync;
-				if(updateSubgraph) {
-					this.resendSynths // for now, just update all
-				} {
-					this.resendSynths([name])
+				this.sched {
+					if(updateSubgraph) {
+						this.resendSynths // for now, just update all
+					} {
+						this.resendSynths([name])
+					}
 				}
 			}
 		}
