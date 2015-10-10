@@ -91,6 +91,22 @@ Steno {
 		}
 	}
 
+	get { |name, key|
+		^settings.get(name, key)
+	}
+
+	getGlobal { |key|
+		^settings.getGlobal(key)
+	}
+
+	fadeTime_ { |dt|
+		this.setGlobal(\fadeTime, dt)
+	}
+
+	fadeTime {
+		^this.getGlobal(\fadeTime)
+	}
+
 	numChannels_ { |n|
 		if(n != numChannels) {
 			busIndices = nil;

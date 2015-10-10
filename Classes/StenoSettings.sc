@@ -18,8 +18,17 @@ StenoSettings {
 		synthSettings[name] = (synthSettings[name] ? ()).putPairs(keyValuePairs);
 	}
 
+	get { |name, key|
+		var setting = synthSettings[name];
+		^setting !? { setting[key] }
+	}
+
 	setGlobal { |keyValuePairs|
 		globalSettings.putPairs(keyValuePairs);
+	}
+
+	getGlobal { |key|
+		^globalSettings[key]
 	}
 
 	addSynthDef { |name, synthDef|
