@@ -82,7 +82,7 @@ StenoSettings {
 		thisSetting.parent = current;
 
 		^thisSetting.use {
-			msgFunc.valueEnvir
+			msgFunc.valueEnvir(thisSetting)
 		}
 
 	}
