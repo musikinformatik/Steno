@@ -282,13 +282,14 @@ method::quant
 Specify the moment of changes relative to a temporal grid (see link::Classes/Quant::).
 code::
 t = Steno.new;
-t.quelle(\a, { Ringz.ar(Impulse.ar(1), { Rand(300, 700) } ! 2, 0.3) });
+t.quelle(\a, { Ringz.ar(Impulse.ar(1), { Rand(200, 700) } ! 2, 0.3) });
 t.quelle(\b, { Ringz.ar(Impulse.ar(2),{ Rand(3000, 7000) } ! 2, 0.1) });
-t.filter('?', { |input| DelayN.ar(input, 0.5, Rand(0, 0.5).round(1/8)) });
+t.filter('&', { |input| DelayN.ar(input, 0.5, Rand(0, 0.5).round(1/6)) * Rand(0.5, 1) + input});
 t.filter('.', { |input| Limiter.ar(input) }); // full stop is a limiter here.
 t.quant = 1;
 t.("abaaabaa.");
-t.("aba?aabaa.");
+t.("aba&aabaa.");
+t.("aba&aab&a&a.");
 ::
 
 
@@ -537,7 +538,7 @@ Steno uses a link::Classes/DiffString:: parser to interpret code. You can change
 code::
 t = Steno.new;
 t.quelle(\hello, { |input| SinOsc.ar(SinOsc.ar(SinOsc.ar(0.1, 0, 1, 2), (input * 10), 400, 800), 0, 0.1) });
-t.quelle(\word, { |input| SinOsc.ar(Saw.ar(SinOsc.ar(0.1 * (input * 3), 0, 1, 2), 300, 800 * (in * 100)), 0, 0.1) });
+t.quelle(\word, { |input| SinOsc.ar(Saw.ar(SinOsc.ar(0.1 * (input * 3), 0, 1, 2), 300, 800 * (input * 100)), 0, 0.1) });
 t.preProcessor = nil; // remove default shortcuts
 t.diff.tokenizer = { |str| str.split($ ) };
 t.verbosity = 2;
