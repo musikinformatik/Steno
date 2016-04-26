@@ -56,7 +56,7 @@ Steno {
 		if(pushSyntax) {
 			thisProcess.interpreter.preProcessor = { |string|
 				string = string.copy; // make it mutable
-				while { string.beginsWith(Char.nl) } { string = string.drop(1) };
+				while { string.beginsWith("\n") } { string = string.drop(1) };
 				if(string.beginsWith("(") and: string.endsWith(")")) { string = string.drop(1).drop(-1) };
 				if(string.beginsWith("--")) { string = "Steno.current.value(\"%\")".format(string.drop(2)) };
 				string
@@ -212,6 +212,7 @@ Steno {
 				args = argList.at(i);
 				newSynth = this.newSynth(token, i, args);
 				if(verbosity > 1) { ("replaced synth" + token).postln };
+				"releasing old synth with id: %".format(synthList.at(i)).postln;
 				synthList.at(i).release;
 				synthList.put(i, newSynth);
 			}
