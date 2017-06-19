@@ -32,7 +32,7 @@ list::
 ## square brackets: nested structure is parallel: code::[ab]c::
 ## round parentheses: nested structure is serial: code::[(ab)(ab)]::
 ## curly brackets: open a stack for operators in postfix syntax: code::{ab*}:: or code::{abc*+}::
-## force a full replacement on eval: code::!abc::
+## force a full replacement on eval: code::abc!::
 ## line ending comments are ignored: code::abc // this is a comment::
 ## variable names are optional and can be declared explicitly, see: link::#-declareVariables::
 ::
@@ -129,7 +129,8 @@ code::
 t.push(true);
 --xaf
 --x[(xaf)(af)(af)]f
---!x[(xaf)(af)(af)]f // force resend with the !-operator
+--x[(xaf)(af)(af)]f! // force resend with the !-operator
+--!x[(xaf)(af)(af)]f // … or prepended
 ::
 
 argument::pushSyntax

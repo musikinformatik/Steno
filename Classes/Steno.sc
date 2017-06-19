@@ -186,10 +186,8 @@ Steno {
 
 		server.openBundle;
 		protect {
-			if(string[0] == $!) {
-				this.freeAll;
-				string = string.drop(1);
-			};
+			if(string[0] == $!) { this.freeAll; string = string.drop(1) };
+			if(string.last == $!) { this.freeAll; string = string.drop(-1) };
 			if(verbosity > 0) { string.postcs };
 			diff.value(string)
 			//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
@@ -676,7 +674,8 @@ Steno {
 			if(str.isNil) {
 				str = steno.cmdLine ? str.class.new; doResend = true;
 			} {
-				if(str[0] == $!) { doResend = true; str = str.drop(1); };
+				if(str.first == $!) { doResend = true; str = str.drop(1); };
+				if(str.last == $!) { doResend = true; str = str.drop(-1); };
 				str = str.replace("\n", " ");
 			};
 
