@@ -310,12 +310,6 @@ t.value("babaf");
 t.value("(ab)f (ab)f");
 ::
 
-warning::In the filter method, when the synth is replaced by a new one, only the input signal is faded out. So you have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control or code::controls[\env]:: to envelope it. There is a synth control input called code::hangTime:: that removes hanging notes after some longer time (after 30 sec by default). You can manually release all potentially hanging synths by calling link::#-releaseHanging::.::
-code::
-t.filter(\x, { |input, controls| CombL.ar(input, 0.2, 0.2, 2) + SinOsc.ar(1000, 0, 0.05) }); // this will hang!
-t.filter(\x, { |input, controls| CombL.ar(input, 0.2, 0.2, 2) + (SinOsc.ar(1000, 0, 0.05) * controls[\env]) }); // this won't
-::
-
 argument::name
 The letter which represents the synth def
 
@@ -380,6 +374,7 @@ t.value("aa((aa(aaa(a)))a)a(((a)))");
 ::
 ::
 
+
 argument::multiChannelExpand
 Specify whether the ugen graph should be expanded o the full number of channels (see: link::#-numChannels:: and link::#-expand::).
 
@@ -388,6 +383,40 @@ Specify whether synth should be updated immediately when synth def is changed (M
 
 argument::numChannels
 Specify a number of channels the function should have (by default, it uses link::#-numChannels::).
+
+discussion::
+
+warning::In the filter method, when the synth is replaced by a new one, only the input signal is faded out. So you have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control or code::controls[\env]:: to envelope it. There is a synth control input called code::hangTime:: that removes hanging notes after some longer time (after 30 sec by default). You can manually release all potentially hanging synths by calling link::#-releaseHanging::.::
+code::
+t.quelle(\o, { Impulse.ar(1) });
+t.("ox");
+
+// replace this while running – no problem
+(
+t.filter(\x, { |input|
+	CombL.ar(input, 0.2, Rand(0.001, 0.02), 2)
+})
+);
+// this will hang, because there is a constant output (the SinOsc)
+(
+t.filter(\x, { |input|
+	CombL.ar(input, 0.2, Rand(0.001, 0.02), 2)
+	+
+	SinOsc.ar(Rand(300, 1000), 0, 0.02)
+})
+);
+ // this is fine: use the synth envelope to fade out the SinOsc
+(
+t.filter(\x, { |input, controls|
+	CombL.ar(input, 0.2, Rand(0.001, 0.02), 2)
+	+
+	SinOsc.ar(Rand(300, 1000), 0, 0.02 * controls[\env])
+})
+);
+::
+
+
+
 
 method::declareVariables
 Add a number of variable names that take signals as value.
