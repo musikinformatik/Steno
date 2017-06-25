@@ -8,6 +8,7 @@ Steno {
 	var <busIndices, <synthList, <argList, <variables;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
+	var <group;
 
 	var argumentStack;
 
@@ -75,6 +76,7 @@ Steno {
 		diff.init;
 		synthList = [];
 		argList = [];
+		group = nil;
 	}
 
 	set { |name ... keyValuePairs|
@@ -134,6 +136,7 @@ Steno {
 			this.rebuildSynthDefs;
 			server.sync;
 			this.sched {
+				this.startGroup;
 				this.resendSynths;
 				this.startMonitor(restart: true);
 			}
@@ -146,6 +149,7 @@ Steno {
 			this.initBusses;
 			this.rebuildSynthDefs;
 			server.sync;
+			this.startGroup;
 			this.value(rawCmdLine);
 			this.startMonitor(restart: true);
 		}
@@ -215,9 +219,11 @@ Steno {
 				synthList.put(i, newSynth);
 			}
 		}
-
 	}
 
+	startGroup {
+		group = group ?? {Group(server)};
+	}
 
 	startMonitor { |restart = false|
 
@@ -226,6 +232,7 @@ Steno {
 		};
 		monitor = Synth(this.prefix(\monitor),
 			[\out, bus ? 0, \in, busIndices.first, \amp, 0.1],
+			target: group,
 			addAction:\addAfter
 		).register;
 
@@ -575,6 +582,7 @@ Steno {
 			beginFunc: {
 				if(Server.default.serverRunning.not) { Error("server not running").throw };
 				this.initArguments;
+				this.startGroup;
 				// add a limiter to the end of the signal chain
 				this.startMonitor;
 			},
@@ -604,6 +612,14 @@ Steno {
 
 	newSynth { |token, i, args|
 		var target = synthList[i - 1];
+		var addAction = if(target.isNil) {
+			 target = group;
+			\addToHead
+		} {
+			\addAfter
+		};
+
+
 		token = token.asSymbol;
 		if(encyclopedia.at(token).isNil) { token = '?' }; // silent
 
@@ -611,7 +627,7 @@ Steno {
 			this.prefix(token),
 			args,
 			target: target, // use previous synth in list. if nil, this is default group.
-			addAction: if(target.isNil) { \addToHead } { \addAfter }
+			addAction: addAction
 		)
 	}
 
