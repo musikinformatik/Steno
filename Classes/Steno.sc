@@ -122,7 +122,7 @@ Steno {
 
 	bus_ { |argBus|
 		if(argBus.isNumber.not and: { argBus.rate != \audio }) {
-			Error("bus must be audio rate and have at least have % channels".format(numChannels)).throw
+			Error("bus must be audio rate and have at least % channels".format(numChannels)).throw
 		};
 		bus = argBus;
 		this.rebuild;
