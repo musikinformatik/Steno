@@ -64,8 +64,8 @@ StenoSignal {
 
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
-		detectSignal = (gate * 100) + LeakDC.ar(signal.sum); // free the synth only if gate is 0.
-		oldSignal = In.ar(outBus + offset, argNumChannels);          // previous signal on bus
+		detectSignal = max(gate, LeakDC.ar(signal.sum));          // free the synth only if gate is 0.
+		oldSignal = In.ar(outBus + offset, argNumChannels);       // previous signal on bus
 		drySignal = In.ar(dryIn + offset, argNumChannels);        // dry signal (may come from another bus, but mostly is same as in)
 		DetectSilence.ar(detectSignal, time: 0.01, doneAction:2); // free the synth when gate = 0 and fx output is silent
 		signal = XFade2.ar(drySignal, signal, mix * 2 - 1); // mix in filter output to dry signal.
