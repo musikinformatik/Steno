@@ -611,9 +611,13 @@ Steno {
 	///////////////////////////////////
 
 	newSynth { |token, i, args|
-		var target = synthList[i - 1];
-		var addAction = if(target.isNil) {
-			 target = group;
+		var target, addAction;
+
+		// if first in list, add synth to encapsulating group
+		// otherwise add it after previous synth in list
+		target = synthList[i - 1];
+		addAction = if(target.isNil) {
+			target = group;
 			\addToHead
 		} {
 			\addAfter
@@ -626,7 +630,7 @@ Steno {
 		^Synth(
 			this.prefix(token),
 			args,
-			target: target, // use previous synth in list. if nil, this is default group.
+			target: target,
 			addAction: addAction
 		)
 	}
