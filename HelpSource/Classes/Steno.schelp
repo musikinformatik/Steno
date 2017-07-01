@@ -1,47 +1,85 @@
 TITLE:: Steno
 summary:: A little language for spinning long strings of synths
-categories::Little Languages, Live Coding
+categories:: Little Languages, Live Coding
 
 related::Tutorials/Steno Tutorial
 
 DESCRIPTION::
 
-Steno, a little concatenative livecoding language embedded in SuperCollider, makes code for combining synth graphs very short, so that writing endless chains is like writing a single long word. A word is a program. A letter is a synth.footnote::This little language was developed together with the students of the music informatics seminar 2013 at the link::http://musikundmedien.net/##IMM::, in particular Armin Badde, Raffael Seyfried and Florian Zeeh. Special thanks also to Hans W. Koch, who moderated the seminar together with me.::
+Steno, a little concatenative live coding language embedded in SuperCollider, makes code for combining synth graphs very short, so that writing endless chains is like writing a single long word. A word is a program. A letter is a synth.footnote::This little language was developed together with the students of the music informatics seminar 2013 at the link::http://musikundmedien.net/##IMM::, in particular Armin Badde, Raffael Seyfried and Florian Zeeh. Special thanks also to Hans W. Koch, who moderated the seminar together with me.::
 
 
-Programs look like this: code::--ab[(ab)(ab)(ab)]c::
+Programs look like this:
+
+code::
+--ab[(ab)(ab)(ab)]c
+::
 
 IMAGE::graph02.svg::
+
+
+Syntax:
+
+Steno has a minimal syntax:
+list::
+## code::"a":: one letter equals one synth
+
+code::abc:: >> three synths in series, one feeding into the next
+
+## code::"[]":: square brackets indicate a parallely nested structure:
+
+code::[ab]c:: >> code::a:: and code::b:: are in parallel to each other, their sum is fed into code::c::
+
+## code::"()":: round brackets indicate serially nested structure
+
+code::[(ab)(ab)]:: >> both appearances of code::ab:: are in series but parallel to each other
+
+## code::"{}":: curly brackets open a stack for operators in postfix syntax
+
+code::{ab*}:: >> code::a:: and code::b:: are fed into the operator code::*::
+code::{abc*+}:: >> code::b:: and code::c:: are fed into the operator code::*::, its result is fed together with code::a:: into +
+
+## code::"!":: an exclamation mark within the expression forces a full replacement at evaluation time
+
+code::abc!::
+
+
+## line ending comments are ignored
+
+code::abc // this is a comment::
+
+## variable names are optional and can be declared explicitly, see: link::#-declareVariables::
+::
 
 
 Semantics:
 
 list::
 
-## For live coding it follows a strong::dual language approach::: You can rewrite both the steno program and its sclang interpretation at runtime. So the meaning of each letter, the synth def, can be changed and the corresponding program changes accordingly.
+## Steno follows a strong::dual language approach::, making it highly suitable for live coding. You can rewrite both the steno program and its sclang interpretation at runtime. So the meaning of each letter, its synthesis definition, can be changed anytime and the corresponding program changes accordingly.
 
-## Programs are composed of concurrently running processes. In other words, the emphasis::whole:: program has no explicit temporal semantics, instead emphasis::each:: component (letter) stands for its own temporal unfolding.
+## Programs are strong::composed of concurrently running processes::. In other words, the emphasis::whole:: program has no explicit temporal semantics, instead emphasis::each:: component (i.e. character) stands for its own temporal unfolding.
 
-## Only the part of the program that corresponds to code that was rewritten is changed. Thus, elements are kept, replaced, removed or inserted accoding to the difference between the old and the new program.
+## Only those parts of the program that are rewritten are newly (re-)evaluated. Thus, elements are kept, replaced, removed or inserted accoding to the difference between the old and the new program.
 ::
 
 
-Steno has a minimal syntax:
+note::
 list::
-## one letter is one synth: code::abc::
-## square brackets: nested structure is parallel: code::[ab]c::
-## round parentheses: nested structure is serial: code::[(ab)(ab)]::
-## curly brackets: open a stack for operators in postfix syntax: code::{ab*}:: or code::{abc*+}::
-## force a full replacement on eval: code::abc!::
-## line ending comments are ignored: code::abc // this is a comment::
-## variable names are optional and can be declared explicitly, see: link::#-declareVariables::
+## This system is experimental, and you may encounter irregular problems.
+
+## Steno does not work on Windows because it relies on the unix code::diff:: command.
+
+## You may have to adapt code::DiffString.tempFilePath = ...:: in case the external code::diff:: command fails to write a temporary file.
+
+::
 ::
 
 
 To avoid live coding troubles, some optional simplifications are given (by the link::#-preProcessor::):
 list::
-## words surrounded by spaces and lines are interpreted as parallel to each other: code::ab ab::
-## spaces are interpreted parallel or sequential, dependent on the context: code::[ab ab]:: -> code::[(ab)(ab)]::, and code::(ab ab):: -> code::([ab][ab])::.
+## in the outer scope, words surrounded by spaces and lines are interpreted as parallel to each other: code::ab ab:: is equivalent to code::[(ab)(ab)]::
+## depending on the current scope (code::():: or code::[]::), spaces determine either parallel or sequential structuring: code::[ab ab]:: -> code::[(ab)(ab)]::, and code::(ab ab):: -> code::([ab][ab])::.
 ## non-matching brackets will be fixed as far as possible: code::"(ab (ab":: will become code::(ab (ab))::
 ::
 
@@ -69,16 +107,6 @@ t.("[(af)(ag)(af)]f");
 t.cmdLine
 t.value; // resend everything
 s.plotTree; // show nodes
-::
-
-note::
-	Steno doesn't work on windows, because it relies on the unix diff command
-
-	If the diff program used by Steno fails to write a temporary file, you may have to change code::DiffString.tempFilePath = ...::
-	::
-
-note::
-This system is experimental, and you may encounter irregular problems.
 ::
 
 
@@ -192,9 +220,10 @@ code::
 (
 t = Steno.new;
 t.quelle(\a, { Blip.ar(\freq.kr(20), 304) * 0.1 });
-t.quelle(\m, { 0.0 }); // dummy
-t.set(\a, \freq, 10); // Ref is written as a tick: `
-t.set(\m, \freq, `{ exprand(3, 70) }); // Ref is written as a tick: `
+t.quelle(\m, { 0.0 }); // do nothing
+t.set(\a, \freq, 10);  // set for all `a`
+t.set(\m, \freq, `{ exprand(3, 70) }); // set for all synths following `m`.
+                                       // Ref is written as a tick: `
 )
 
 
@@ -470,9 +499,10 @@ definitionlist::
 ::
 
 method::operator
-Define a new operator. Operators take operands (signals) from the stack and combine them. A stack is defined by enclosing an expreaaion in curly brackets, like code::{ab*}::. If operands are left on the stack, they can be combined with the result by subsequent operators, like code::{abc+*}::.
+Define a new operator. Operators take operands (signals) from the stack and combine them. A stack is defined by enclosing an expression in curly brackets, like code::{ab*}::. If operands are left on the stack, they can be combined with the result by subsequent operators, like code::{abc+*}::.
 
 warning::You have to take care that your processed output will become silent after some time. If you add a signal to the output, use the code::\gate.kr:: control or code::controls[\env]:: to envelope it. strong::See above:: under link::#-filter::::
+
 
 argument::name
 The letter which represents the synth def
@@ -482,6 +512,12 @@ A UGen function, which takes a specific number of arguments (given by its arity 
 
 argument::arity
 The number of operands (e.g. binary, or ternary).
+
+argument::multiChannelExpand
+Specify whether the ugen graph should be expanded o the full number of channels (see: link::#-numChannels:: and link::#-expand::).
+
+argument::update
+Specify whether synth should be updated immediately when synth def is changed (MAY CHANGE IN THE FUTURE).
 
 code::
 t = Steno.new;
