@@ -580,7 +580,7 @@ Steno {
 				};
 			},
 			beginFunc: {
-				if(Server.default.serverRunning.not) { Error("server not running").throw };
+				if(server.serverRunning.not) { Error("server not running").throw };
 				this.initArguments;
 				this.startGroup;
 				// add a limiter to the end of the signal chain
