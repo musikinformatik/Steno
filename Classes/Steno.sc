@@ -164,7 +164,7 @@ Steno {
 	}
 
 	releaseHanging {
-		if(server.serverRunning and: {group.notNil}) { server.sendMsg("/n_set", group.nodeID, \steno_unhang, 1.0) };
+		if(server.serverRunning and: { group.notNil }) { server.sendMsg("/n_set", group.nodeID, \steno_unhang, 1.0) };
 	}
 
 	value { |string|
