@@ -1,7 +1,7 @@
 DiffString {
 
-	var insertFunc, removeFunc, swapFunc, keepFunc;
-	var beginFunc, returnFunc, testFunc = true;
+	var <>insertFunc, <>removeFunc, <>swapFunc, <>keepFunc;
+	var <>beginFunc, <>returnFunc, <>testFunc = true;
 	var <>verbose = false;
 	classvar <>tempFilePath = "~/Desktop/";
 	// state:
