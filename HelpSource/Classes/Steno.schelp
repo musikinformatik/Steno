@@ -449,11 +449,11 @@ t.filter(\x, { |input, controls|
 
 
 method::declareVariables
-Add a number of variable names that take signals as value.
+Add a number of variable names that can be used to store and recall signals.
 
 argument::names
 An array of variable names, usually single letters (for exceptions, see: link::#-preProcess::).
-The first time, a variable name is encountered, its value becomes the signal to the left of it.
+The first times, a variable name is encountered, its value becomes the signal to its left. Every time it appears again, it recalls its value and distributes it to the right.
 
 
 code::
@@ -483,19 +483,19 @@ t.filter('.', { |in| 0.0 }); // signal sink blocks signal.
 Tdef(\x, { loop { t.setGlobal(\through, 1.0.rand); 2.wait } }).play;
 ::
 
-You can set the following parameters:
+You can set the following parameters (default values in brackets):
 definitionlist::
-##mix
-|| How much of the signal to output
+##mix (1)
+|| How much of the stored signal is forwarded to the right
 
-##through
-|| How much of the previous signal to output
+##through (1)
+|| How much of the signal to its left is forwarded to the right
 
 ##feedback
 || A value between 0.0 and 1.0 determines the feedback from the last declaration to the first declaration
 
-##assignment
-|| The number of times a variable can be assigned in succession (signals are mixed)
+##assignment (1)
+|| The number of times a variable can be assigned in succession (left to right). If number is reached, the signal is not altered anymore. Assigned signals are mixed down.
 ::
 
 method::operator
@@ -589,7 +589,7 @@ method::prevTokens
 Returns the most recent tokens (the cmdLine split into separate elements, by default letters, but this could also be otherwise, see link::#-preProcessor::).
 
 
-method::argList, synthList, busses, diff, encyclopedia, server, synthList, maxBracketDepth
+method::argList, synthList, diff, encyclopedia, server, synthList, maxBracketDepth
 Introspection: returns internal representations of busses, synthdefs, synths, and synth ressources.
 
 
