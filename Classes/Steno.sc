@@ -417,9 +417,16 @@ Steno {
 				"new variable as ".post;
 				this.filter(name, { |input, controls|
 					var bus = Bus.audio(server, numChannels);
-					var in = XFade2.ar(In.ar(bus, numChannels), InFeedback.ar(bus, numChannels), \feedback.kr.linlin(0, 1, -1, 1));
+					var in = XFade2.ar(
+						inA: In.ar(bus, numChannels),
+						inB: InFeedback.ar(bus, numChannels) * \feedback.kr.sign,
+						pan: \feedback.kr.abs.linlin(0, 1, -1, 1)
+					);
 					variables[name].free; variables[name] = bus;
-					Out.ar(bus, input * (\tokenIndex.kr < \assignment.kr(1))); // \assignment can be increased for feeding in more than one signals
+
+					// \assignment can be increased for feeding in more than one signal
+					Out.ar(bus, input * (\tokenIndex.kr < \assignment.kr(1)));
+
 					in * controls[\env] + input
 				})
 
