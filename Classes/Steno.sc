@@ -446,12 +446,23 @@ Steno {
 	initSynthDefs {
 		var routingFunction, dummyOpeningFunction;
 		// we always go through a limiter here.
-		this.addSynthDef(\monitor, { |out, in, amp = 0.1|
+
+		// LFSaw.de -- quite heavy processing and sound shaping, I'll rather reduce the signal (since there's likely lots of summation happening) and have the intended level up.
+		// this.addSynthDef(\monitor, { |out, in, amp = 0.1|
+		// 	Out.ar(out,
+		// 		Limiter.ar(
+		// 			In.ar(in, numChannels),
+		// 			amp,
+		// 			0.1
+		// 		)
+		// 	)
+		// }, force:true);
+		this.addSynthDef(\monitor, { |out, in, amp = 0.1, level = 0.9|
 			Out.ar(out,
 				Limiter.ar(
-					In.ar(in, numChannels),
-					amp,
-					0.1
+					In.ar(in, numChannels) * amp,
+					level,
+					0.05
 				)
 			)
 		}, force:true);
