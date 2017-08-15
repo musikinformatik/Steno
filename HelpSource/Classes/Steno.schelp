@@ -490,8 +490,8 @@ definitionlist::
 ##through (1)
 || How much of the signal to its left is forwarded to the right
 
-##feedback
-|| A value between 0.0 and 1.0 determines the feedback from the last declaration to the first declaration
+##feedback (0)
+|| An attenuverter ranging between -1.0 and 1.0. Its absolute value determines the amount feedback from the right-most declaration to the left-most. If negative, the feedback is phase-inverted.
 
 ##assignment (1)
 || The number of times a variable can be assigned in succession (left to right). If the number is reached, the signal is not altered anymore. Assigned signals are mixed down to one multichannel stream.
