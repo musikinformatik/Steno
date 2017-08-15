@@ -6,6 +6,7 @@ Steno {
 	var <encyclopedia, <operators;
 	var <monitor, <diff;
 	var <busIndices, <synthList, <argList, <variables;
+	var <fadeBus;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
 	var <group;
@@ -241,7 +242,8 @@ Steno {
 	initBusses {
 		var n;
 		if(busIndices.isNil) {
-			n = numChannels * maxBracketDepth;
+			// allocate busses for maxBracketDepth plus fadeBus (used in filter fades)
+			n = numChannels * (maxBracketDepth + 1);
 			busIndices = server.audioBusAllocator.alloc(n);
 			if(busIndices.isNil) {
 				"not enough busses available! Please reboot the server"
@@ -249,6 +251,7 @@ Steno {
 			};
 
 			busIndices = busIndices + (0, numChannels .. n);
+			fadeBus = busIndices.last + numChannels;
 		}
 	}
 	//////////////////// getting information about the resulting synth graph ////////////
@@ -576,13 +579,14 @@ Steno {
 				};
 			},
 			swapFunc: { |token, i|
-				var synth, args;
+				var synth, args, currentSynth;
 				if(i >= synthList.size) {
 					"swapFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
 					args = this.calcNextArguments(token);
-					synthList.at(i).release;
-					synth = this.newSynth(token, i, args);
+					currentSynth = synthList.at(i);
+					synth = this.newSynth(token, i, args ++ [\replacement, 1], currentSynth.nodeID); // place new synth after old
+					currentSynth.release;
 					synthList.put(i, synth);
 					argList.put(i, args);
 				};
@@ -628,12 +632,13 @@ Steno {
 	// create new synth from token
 	///////////////////////////////////
 
-	newSynth { |token, i, args|
-		var target, addAction;
+	newSynth { |token, i, args, target|
+		var addAction;
 
+		// LFSaw.de: if target not explicitely given (needed for replacement, to place new synth _after_ old):
 		// if first in list, add synth to encapsulating group
 		// otherwise add it after previous synth in list
-		target = synthList[i - 1];
+		target = target ?? {synthList[i - 1]};
 		addAction = if(target.isNil) {
 			target = group;
 			\addToHead
@@ -697,7 +702,7 @@ Steno {
 		//"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
 		//"% args: %\n".postf(token, args);
 
-		args = settings.calcNextArguments(token, controls) ++ args; // append the necessary args, so they can't be overridden
+		args = settings.calcNextArguments(token, controls) ++ args  ++ [\fadeBus, fadeBus]; // append the necessary args, so they can't be overridden
 		//"% args: %\n".postf(token, args);
 		^args
 
