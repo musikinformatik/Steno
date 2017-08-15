@@ -208,8 +208,7 @@ Special values are:
 table::
 ##strong::fadeTime:: || cross fade time ||  default: 0.02
 ##strong::attack:: || ratio of fadeTime used as attack (for 1, it equals fadeTime) || default: 0
-##strong::mix:: || sound level || default: 1
-##strong::through:: || for filters: pre vs. post level || default: 0
+##strong::mix:: || sound level. for filters: pre vs. post level || default: 1
 ##strong::hangTime:: || for filters, as a maximum release tail length, unless fadeTime is longer || default: 30
 ::
 
@@ -483,6 +482,9 @@ A UGen function, which takes a specific number of arguments (given by its arity 
 argument::arity
 The number of operands (e.g. binary, or ternary).
 
+argument::multiChannelExpand
+argument::update
+
 code::
 t = Steno.new;
 t.quelle(\a, { SinOsc.ar(Rand(0.9, 1.1) * 440) * 0.2 });
@@ -553,8 +555,8 @@ method::prevTokens
 Returns the most recent tokens (the cmdLine split into separate elements, by default letters, but this could also be otherwise, see link::#-preProcessor::).
 
 
-method::argList, synthList, busses, diff, encyclopedia, server, synthList, maxBracketDepth
-Introspection: returns internal representations of busses, synthdefs, synths, and synth ressources.
+method::argList, synthList, diff, encyclopedia, server, synthList, maxBracketDepth
+Introspection: returns internal representations of synthdefs, synths, and synth ressources.
 
 
 method::preProcess
