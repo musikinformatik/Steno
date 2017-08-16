@@ -416,11 +416,12 @@ Steno {
 			if(variables[name].isNil) {
 				"new variable as ".post;
 				this.filter(name, { |input, controls|
+					var feedback = \feedback.kr(0);
 					var bus = Bus.audio(server, numChannels);
 					var in = XFade2.ar(
 						inA: In.ar(bus, numChannels),
-						inB: InFeedback.ar(bus, numChannels) * \feedback.kr.sign,
-						pan: \feedback.kr.abs.linlin(0, 1, -1, 1)
+						inB: InFeedback.ar(bus, numChannels) * feedback.sign,
+						pan: feedback.abs.linlin(0, 1, -1, 1)
 					);
 					variables[name].free; variables[name] = bus;
 
