@@ -243,15 +243,14 @@ Steno {
 		var n;
 		if(busIndices.isNil) {
 			// allocate busses for maxBracketDepth plus fadeBus (used in filter fades)
-			n = numChannels * (maxBracketDepth + 1);
+			n = numChannels * maxBracketDepth;
 			busIndices = server.audioBusAllocator.alloc(n);
-			if(busIndices.isNil) {
+			fadeBus = server.audioBusAllocator.alloc(numChannels);
+			if(busIndices.isNil || {fadeBus.isNil}) {
 				"not enough busses available! Please reboot the server"
 				"or increase the number of audio bus channels in ServerOptions".throw
 			};
-
-			busIndices = busIndices + (0, numChannels .. n);
-			fadeBus = busIndices.last + numChannels;
+			busIndices = busIndices + (0, numChannels .. (n-1));
 		}
 	}
 	//////////////////// getting information about the resulting synth graph ////////////
@@ -484,9 +483,9 @@ Steno {
 			signal = XFade2.ar(inputOutside, stenoSignal.input, MulAdd(stenoSignal.mix, 2, -1));
 
 			signal = Mix.ar([
-				signal, 
+				signal,
 				oldSignal * max(
-					stenoSignal.through.varlag(stenoSignal.fadeTime, start: 0), 
+					stenoSignal.through.varlag(stenoSignal.fadeTime, start: 0),
 					1 - stenoSignal.env
 				)
 			]);   // fade old input according to gate, signal is supposed to fade out itself.
