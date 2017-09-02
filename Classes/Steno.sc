@@ -246,7 +246,7 @@ Steno {
 			n = numChannels * maxBracketDepth;
 			busIndices = server.audioBusAllocator.alloc(n);
 			fadeBus = server.audioBusAllocator.alloc(numChannels);
-			if(busIndices.isNil || {fadeBus.isNil}) {
+			if(busIndices.isNil or: { fadeBus.isNil }) {
 				"not enough busses available! Please reboot the server"
 				"or increase the number of audio bus channels in ServerOptions".throw
 			};
