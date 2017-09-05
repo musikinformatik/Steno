@@ -1,9 +1,8 @@
 
 StenoSignal {
 	var <numChannels, <multiChannelExpand;
-	// LFSaw.de: made attack an equitable param
 	var <inBus, <outBus, <env, <gate, <fadeTime, fadeEnv, <attack, <mix, <through, <dryIn;
-	var <fadeBus, replacement; // LFSaw.de: used for filter fades
+	var <tailBus; // holds tails of replaced synths
 	var <synthIndex, <index, <nestingDepth, <input, <controls;
 	var outputSignals;
 
@@ -16,8 +15,7 @@ StenoSignal {
 		inBus = \in.kr(0);
 		dryIn = \dryIn.kr(0);
 		input = In.ar(inBus, numChannels).asArray;
-		fadeBus = \fadeBus.ir(0); // LFSaw.de: used for filter fades
-		replacement = \replacement.ir(0);
+		tailBus = \tailBus.ir(0);
 
 		outBus = \out.kr(0);
 		outputSignals = Array.fill(numChannels, 0.0);
@@ -51,19 +49,14 @@ StenoSignal {
 
 	// get filter input
 	filterInput { |argNumChannels, offset = 0|
-		var sig, bus;
-		// if this synth is a replacement for another one, 
-		// read from alternative bus during attack time, switch to inBus afterwards
-		bus = Select.kr(replacement * (1-ToggleFF.kr(env < 1)), [inBus, fadeBus]);
-		sig = In.ar(bus, numChannels).asArray.drop(offset);
+		var sig;
+
+		sig = In.ar(inBus, numChannels).asArray.drop(offset);
 
 		if(argNumChannels.notNil) {
 			sig = sig.keep(argNumChannels);
 			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
 		};
-
-		// if gate is released, write unprocessed input to fadeBus
-		ReplaceOut.ar(fadeBus, Select.ar(ToggleFF.kr(gate), [input, Silent.ar()]));
 
 
 		^(sig * env)
@@ -77,21 +70,16 @@ StenoSignal {
 			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
 		};
 
-		// if gate is released, write unprocessed input to fadeBus
-		ReplaceOut.ar(fadeBus, Select.ar(ToggleFF.kr(gate), [input, Silent.ar()]));
-
 		^sig
 	}
 
 	// set filter output
 	filterOutput { |signal, argNumChannels, offset = 0|
-		var gateHappened, dcBlocked, oldSignal, drySignal;
+		var gateHappened, dcBlocked, oldSignal, drySignal, tailSignal;
 		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
-
-		// LFSaw.de: grouped elements thematically, added comments, changed var names, fixed fading
 
 		// gating analysis
 		gateHappened = gate <= 0;
@@ -109,9 +97,16 @@ StenoSignal {
 
 		oldSignal = In.ar(outBus + offset, argNumChannels); // previous signal on bus
 		drySignal = In.ar(dryIn  + offset, argNumChannels); // dry signal (mostly same as oldSignal but may come from another bus)
-
-		signal = XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)); // mix filter output with dry signal
-		signal = Mix.ar([signal, oldSignal * max(through.varlag(fadeTime, start: 0), 1 - env)]);   // fade old input according to gate, signal is supposed to fade out itself.
+		tailSignal = In.ar(tailBus + offset, argNumChannels); // tails from replaced synths
+		
+		// fade old signal according to 1-env 
+		// signal is supposed to fade out itself (envelope assigned at filter input)
+		// `through` is used to carry original signal in the parallel case
+		signal = Mix.ar([
+			XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)), // mix filter output with dry signal
+			tailSignal, 
+			oldSignal * max(through, 1 - env)
+		]);
 
 		this.addOutput(signal, offset);
 	}
@@ -124,7 +119,6 @@ StenoSignal {
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
 
-		// LFSaw.de: reordered to group thematical elements together
 		oldSignal = In.ar(outBus + offset, argNumChannels);          // previous signal on bus
 
 		signal = XFade2.ar(oldSignal, MulAdd(signal, env, oldSignal), MulAdd(mix, 2, -1));
@@ -167,10 +161,18 @@ StenoSignal {
 	writeToBus {
 		outputSignals !? {
 			outputSignals.keep(numChannels);
-			ReplaceOut.ar(outBus.varlag(
-				fadeTime, 
-				warp: \hold)
-			, outputSignals.keep(numChannels))
+
+			// write to tailBus if not last synth in replaceGroup, else write silence
+			ReplaceOut.ar(outBus, Select.ar(1-gate, [
+				outputSignals.keep(numChannels),
+				Silent.ar!numChannels, 
+			]));
+
+
+			// write to tailBus if last synth in replaceGroup (i.e. newest)
+			// TODO: if release (not replace), continue writing
+			XOut.ar(outBus, gate, outputSignals.keep(numChannels));
+
 		}
 	}
 

@@ -6,7 +6,7 @@ Steno {
 	var <encyclopedia, <operators;
 	var <monitor, <diff;
 	var <busIndices, <synthList, <argList, <variables;
-	var <fadeBus;
+	var <tailBus;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
 	var <group;
@@ -242,11 +242,11 @@ Steno {
 	initBusses {
 		var n;
 		if(busIndices.isNil) {
-			// allocate busses for maxBracketDepth plus fadeBus (used in filter fades)
+			// allocate busses for maxBracketDepth plus tailBus (used in filter fades)
 			n = numChannels * maxBracketDepth;
 			busIndices = server.audioBusAllocator.alloc(n);
-			fadeBus = server.audioBusAllocator.alloc(numChannels);
-			if(busIndices.isNil or: { fadeBus.isNil }) {
+			tailBus = server.audioBusAllocator.alloc(numChannels);
+			if(busIndices.isNil or: { tailBus.isNil }) {
 				"not enough busses available! Please reboot the server"
 				"or increase the number of audio bus channels in ServerOptions".throw
 			};
@@ -612,7 +612,7 @@ Steno {
 				} {
 					args = this.calcNextArguments(token);
 					currentSynth = synthList.at(i);
-					synth = this.newSynth(token, i, args ++ [\replacement, 1], currentSynth.nodeID); // place new synth after old
+					synth = this.newSynth(token, i, args, currentSynth.nodeID); // place new synth after old
 					currentSynth.release;
 					synthList.put(i, synth);
 					argList.put(i, args);
@@ -729,7 +729,7 @@ Steno {
 		//"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
 		//"% args: %\n".postf(token, args);
 
-		args = settings.calcNextArguments(token, controls) ++ args  ++ [\fadeBus, fadeBus]; // append the necessary args, so they can't be overridden
+		args = settings.calcNextArguments(token, controls) ++ args  ++ [\tailBus, tailBus]; // append the necessary args, so they can't be overridden
 		//"% args: %\n".postf(token, args);
 		^args
 

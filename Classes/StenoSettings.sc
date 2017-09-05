@@ -3,7 +3,7 @@ StenoSettings {
 	var <globalSettings, <synthSettings, <msgFuncs, <current;
 	var <>lexicalScope = true;
 	var stack;
-	var internalArgs = #[\in, \out, \dryIn, \through, \gate, \fadeBus, \replacement];
+	var internalArgs = #[\in, \out, \dryIn, \through, \gate, \tailBus];
 
 	*new { ^super.new.init }
 
