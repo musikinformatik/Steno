@@ -485,7 +485,7 @@ Steno {
 			signal = Mix.ar([
 				signal,
 				oldSignal * max(
-					stenoSignal.through.varlag(stenoSignal.fadeTime, start: 0),
+					stenoSignal.through,
 					1 - stenoSignal.env
 				)
 			]);   // fade old input according to gate, signal is supposed to fade out itself.
