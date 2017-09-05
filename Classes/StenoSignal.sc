@@ -99,12 +99,16 @@ StenoSignal {
 		drySignal = In.ar(dryIn  + offset, argNumChannels); // dry signal (mostly same as oldSignal but may come from another bus)
 		tailSignal = In.ar(tailBus + offset, argNumChannels); // tails from replaced synths
 		
-		// fade old signal according to 1-env 
-		// signal is supposed to fade out itself (envelope assigned at filter input)
-		// `through` is used to carry original signal in the parallel case
 		signal = Mix.ar([
-			XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)), // mix filter output with dry signal
+			  // mix filter output with dry signal
+			  // signal is supposed to fade out itself (envelope assigned at filter input)
+			XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)),
+			
+			  // collect tails
 			tailSignal, 
+			
+			  // fade old signal according to 1-env 
+			  // `through` is used to carry original signal in the parallel case
 			oldSignal * max(through, 1 - env)
 		]);
 
@@ -113,15 +117,27 @@ StenoSignal {
 
 	// set quelle output
 	quelleOutput { |signal, argNumChannels, offset = 0|
-		var localMix, oldSignal;
+		var oldSignal, tailSignal;
 		argNumChannels = min(argNumChannels ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
 
-		oldSignal = In.ar(outBus + offset, argNumChannels);          // previous signal on bus
+		oldSignal  = In.ar(outBus + offset, argNumChannels);  // previous signal on bus
+		tailSignal = In.ar(tailBus + offset, argNumChannels); // tails from replaced synths
 
-		signal = XFade2.ar(oldSignal, MulAdd(signal, env, oldSignal), MulAdd(mix, 2, -1));
+
+		signal = Mix.ar([
+			  // signal strength (mix) and envelope multiplication
+			signal * mix * env,
+
+			  // collect tails
+			tailSignal,
+
+			  // only add old signal if last in replaceGroup
+			  // TODO: if release (not replace), continue mixing
+			oldSignal * gate
+		]);
 
 		FreeSelfWhenDone.kr(env);                                    // free synth if gate 0
 		this.addOutput(signal, offset);
@@ -161,16 +177,12 @@ StenoSignal {
 	writeToBus {
 		outputSignals !? {
 			outputSignals.keep(numChannels);
+			// write to tailBus if going to be replaced, else write silence
+			// TODO: write silence if release (not replace)
+			ReplaceOut.ar(tailBus, outputSignals.keep(numChannels) * (1 - gate));
 
-			// write to tailBus if not last synth in replaceGroup, else write silence
-			ReplaceOut.ar(outBus, Select.ar(1-gate, [
-				outputSignals.keep(numChannels),
-				Silent.ar!numChannels, 
-			]));
-
-
-			// write to tailBus if last synth in replaceGroup (i.e. newest)
-			// TODO: if release (not replace), continue writing
+			// write to outBus unless goint to be replaced
+			// TODO: write to outBus if release (not replace)
 			XOut.ar(outBus, gate, outputSignals.keep(numChannels));
 
 		}
