@@ -463,7 +463,7 @@ Steno {
 		this.addSynthDef(\monitor, { |out, in, amp = 0.1, level = 0.9|
 			Out.ar(out,
 				Limiter.ar(
-					In.ar(in, numChannels) * amp,
+					LeakDC.ar(In.ar(in, numChannels)) * amp,
 					level,
 					0.05
 				)
