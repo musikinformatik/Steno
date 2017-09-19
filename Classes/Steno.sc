@@ -58,7 +58,7 @@ Steno {
 			thisProcess.interpreter.preProcessor = { |string|
 				string = string.copy; // make it mutable
 				while { string.beginsWith("\n") } { string = string.drop(1) };
-				if(string.beginsWith("(") and: string.endsWith(")")) { string = string.drop(1).drop(-1) };
+				if(string.beginsWith("(\n--") and: string.endsWith("\n)")) { string = string.drop(2).drop(-2) };
 				if(string.beginsWith("--")) { string = "Steno.current.value(\"%\")".format(string.drop(2)) };
 				string
 			}
