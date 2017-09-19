@@ -6,6 +6,7 @@ Steno {
 	var <encyclopedia, <operators;
 	var <monitor, <diff;
 	var <busIndices, <synthList, <argList, <variables;
+	var <fadeBus;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
 	var <group;
@@ -241,14 +242,15 @@ Steno {
 	initBusses {
 		var n;
 		if(busIndices.isNil) {
+			// allocate busses for maxBracketDepth plus fadeBus (used in filter fades)
 			n = numChannels * maxBracketDepth;
 			busIndices = server.audioBusAllocator.alloc(n);
-			if(busIndices.isNil) {
+			fadeBus = server.audioBusAllocator.alloc(numChannels);
+			if(busIndices.isNil or: { fadeBus.isNil }) {
 				"not enough busses available! Please reboot the server"
 				"or increase the number of audio bus channels in ServerOptions".throw
 			};
-
-			busIndices = busIndices + (0, numChannels .. n);
+			busIndices = busIndices + (0, numChannels .. (n-1));
 		}
 	}
 	//////////////////// getting information about the resulting synth graph ////////////
@@ -416,11 +418,12 @@ Steno {
 			if(variables[name].isNil) {
 				"new variable as ".post;
 				this.filter(name, { |input, controls|
+					var feedback = \feedback.kr(0);
 					var bus = Bus.audio(server, numChannels);
 					var in = XFade2.ar(
 						inA: In.ar(bus, numChannels),
-						inB: InFeedback.ar(bus, numChannels) * \feedback.kr.sign,
-						pan: \feedback.kr.abs.linlin(0, 1, -1, 1)
+						inB: InFeedback.ar(bus, numChannels) * feedback.sign,
+						pan: feedback.abs.linlin(0, 1, -1, 1)
 					);
 					variables[name].free; variables[name] = bus;
 
@@ -469,20 +472,47 @@ Steno {
 
 		// same for all closing brackets
 		// mix controls balance between serial bus result and outside bus
-		routingFunction = { |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var input = In.ar(in, numChannels); // in: result of serial synths
-			var oldSignal = In.ar(out, numChannels); // the old signal on the bus, mixed in by through
-			var inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
-			var signalOnMixBus = input + (through * oldSignal);
-			var output = XFade2.ar(inputOutside, signalOnMixBus, mix * 2 - 1);
-			ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
-			XOut.ar(out, EnvGate.new, output); // overwrite the out channel with the new mix
+		routingFunction = {// |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
+			var oldSignal, inputOutside, stenoSignal, signal, signalOnMixBus;
+
+			stenoSignal = StenoSignal(numChannels);
+			stenoSignal.filterInput;
+			oldSignal = In.ar(stenoSignal.outBus, numChannels); // the old signal on the bus, mixed in by through
+			inputOutside = In.ar(stenoSignal.dryIn, numChannels);  // dryIn: bus outside parenthesis
+
+			signal = XFade2.ar(inputOutside, stenoSignal.input, MulAdd(stenoSignal.mix, 2, -1));
+
+			signal = Mix.ar([
+				signal,
+				oldSignal * max(
+					stenoSignal.through.varlag(stenoSignal.fadeTime, start: 0),
+					1 - stenoSignal.env
+				)
+			]);   // fade old input according to gate, signal is supposed to fade out itself.
+
+			FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
+			ReplaceOut.ar(stenoSignal.inBus, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
+
+			stenoSignal.addOutput(signal);
+			stenoSignal.writeToBus;
 		};
 
 		// nothing to do, just clean up bus, to be sure.
-		dummyOpeningFunction = { |in, out|
-			ReplaceOut.ar(out, Silent.ar(numChannels)); // umbrella
-			FreeSelf.kr(\gate.kr(1) < 1); // dummy synth, can be released
+		// dummyOpeningFunction = {
+		// 	var stenoSignal;
+
+		// 	stenoSignal = StenoSignal(numChannels);
+		// 	stenoSignal.filterInput;
+		// 	ReplaceOut.ar(stenoSignal.outBus, Silent.ar(numChannels)); // umbrella
+		// 	FreeSelfWhenDone.kr(stenoSignal.env);
+		// };
+		dummyOpeningFunction = {
+			var stenoSignal;
+			stenoSignal = StenoSignal(numChannels);
+			stenoSignal.quelle(nil, true, numChannels);
+			FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
+
+			stenoSignal.writeToBus;
 		};
 
 		// begin serial: dry = in
@@ -576,13 +606,14 @@ Steno {
 				};
 			},
 			swapFunc: { |token, i|
-				var synth, args;
+				var synth, args, currentSynth;
 				if(i >= synthList.size) {
 					"swapFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
 					args = this.calcNextArguments(token);
-					synthList.at(i).release;
-					synth = this.newSynth(token, i, args);
+					currentSynth = synthList.at(i);
+					synth = this.newSynth(token, i, args ++ [\replacement, 1], currentSynth.nodeID); // place new synth after old
+					currentSynth.release;
 					synthList.put(i, synth);
 					argList.put(i, args);
 				};
@@ -628,12 +659,13 @@ Steno {
 	// create new synth from token
 	///////////////////////////////////
 
-	newSynth { |token, i, args|
-		var target, addAction;
+	newSynth { |token, i, args, target|
+		var addAction;
 
+		// LFSaw.de: if target not explicitely given (needed for replacement, to place new synth _after_ old):
 		// if first in list, add synth to encapsulating group
 		// otherwise add it after previous synth in list
-		target = synthList[i - 1];
+		target = target ?? {synthList[i - 1]};
 		addAction = if(target.isNil) {
 			target = group;
 			\addToHead
@@ -697,7 +729,7 @@ Steno {
 		//"after %,  the argument index is %\n".postf(token, argumentStack.argumentIndex);
 		//"% args: %\n".postf(token, args);
 
-		args = settings.calcNextArguments(token, controls) ++ args; // append the necessary args, so they can't be overridden
+		args = settings.calcNextArguments(token, controls) ++ args  ++ [\fadeBus, fadeBus]; // append the necessary args, so they can't be overridden
 		//"% args: %\n".postf(token, args);
 		^args
 

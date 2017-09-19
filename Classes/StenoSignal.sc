@@ -1,7 +1,9 @@
 
 StenoSignal {
 	var <numChannels, <multiChannelExpand;
-	var <inBus, <outBus, <env, <gate, <fadeTime, <mix, <through, <dryIn;
+	// LFSaw.de: made attack an equitable param
+	var <inBus, <outBus, <env, <gate, <fadeTime, fadeEnv, <attack, <mix, <through, <dryIn;
+	var <fadeBus, replacement; // LFSaw.de: used for filter fades
 	var <synthIndex, <index, <nestingDepth, <input, <controls;
 	var outputSignals;
 
@@ -11,21 +13,27 @@ StenoSignal {
 	}
 
 	init {
-		var attack;
 		inBus = \in.kr(0);
+		dryIn = \dryIn.kr(0);
+		input = In.ar(inBus, numChannels).asArray;
+		fadeBus = \fadeBus.ir(0); // LFSaw.de: used for filter fades
+		replacement = \replacement.ir(0);
+
 		outBus = \out.kr(0);
+		outputSignals = Array.fill(numChannels, 0.0);
+
 		gate = \gate.kr(1);
 		fadeTime = \fadeTime.kr(0.02);
-		attack = \attack.kr(0);
-		env = EnvGen.kr(Env.asr(attack * fadeTime, 1, fadeTime), gate);
+		attack = \attack.kr(0.02);
+		env = EnvGen.kr(Env.asr(attack, 1, fadeTime, [-2, 2]), gate);
+
 		mix = \mix.kr(1);
-		through = \through.kr(0);
-		dryIn = \dryIn.kr(0);
+		through = \through.kr(0); // used for brackets, no external parameter
+
 		synthIndex = \synthIndex.kr(0);
 		index = \index.kr(0);
 		nestingDepth = \nestingDepth.kr(0);
-		input = In.ar(inBus, numChannels).asArray;
-		outputSignals = Array.fill(numChannels, 0.0);
+
 		// see also StenoStack:updateControls
 		controls = (
 			index: index,
@@ -43,7 +51,22 @@ StenoSignal {
 
 	// get filter input
 	filterInput { |argNumChannels, offset = 0|
-		^this.quelleInput(argNumChannels, offset) * env
+		var sig, bus;
+		// if this synth is a replacement for another one, 
+		// read from alternative bus during attack time, switch to inBus afterwards
+		bus = Select.kr(replacement * (1-ToggleFF.kr(env < 1)), [inBus, fadeBus]);
+		sig = In.ar(bus, numChannels).asArray.drop(offset);
+
+		if(argNumChannels.notNil) {
+			sig = sig.keep(argNumChannels);
+			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
+		};
+
+		// if gate is released, write unprocessed input to fadeBus
+		ReplaceOut.ar(fadeBus, Select.ar(ToggleFF.kr(gate), [input, Silent.ar()]));
+
+
+		^(sig * env)
 	}
 
 	// get quelle input
@@ -53,43 +76,60 @@ StenoSignal {
 			sig = sig.keep(argNumChannels);
 			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
 		};
+
+		// if gate is released, write unprocessed input to fadeBus
+		ReplaceOut.ar(fadeBus, Select.ar(ToggleFF.kr(gate), [input, Silent.ar()]));
+
 		^sig
 	}
 
 	// set filter output
 	filterOutput { |signal, argNumChannels, offset = 0|
-		var gateHappened, detectSignal, oldSignal, drySignal;
-
+		var gateHappened, dcBlocked, oldSignal, drySignal;
 		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
-		detectSignal = max(gate, LeakDC.ar(signal.sum));          // free the synth only if gate is 0.
-		oldSignal = In.ar(outBus + offset, argNumChannels);       // previous signal on bus
-		drySignal = In.ar(dryIn + offset, argNumChannels);        // dry signal (may come from another bus, but mostly is same as in)
-		DetectSilence.ar(detectSignal, time: 0.01, doneAction:2); // free the synth when gate = 0 and fx output is silent
-		signal = XFade2.ar(drySignal, signal, mix * 2 - 1); // mix in filter output to dry signal.
-		signal = signal + (oldSignal * max(through, 1 - env)); // when the gate is switched off (released), let old input through
 
-		// remove hanging notes if necessary:
+		// LFSaw.de: grouped elements thematically, added comments, changed var names, fixed fading
+
+		// gating analysis
 		gateHappened = gate <= 0;
-		FreeSelf.kr(TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30))) + (gateHappened * \steno_unhang.tr(0)));
+		dcBlocked = LeakDC.ar(signal.sum);
+
+		// free synth if signal constant for fadeTime:
+		DetectSilence.ar(max(gate, dcBlocked), time: fadeTime, doneAction:2);
+
+		// if signal not constant, remove hanging notes some time after release
+		FreeSelf.kr(
+			TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30)))      //  or
+			// + (gateHappened * \steno_unhang.tr(0))
+		);
+
+
+		oldSignal = In.ar(outBus + offset, argNumChannels); // previous signal on bus
+		drySignal = In.ar(dryIn  + offset, argNumChannels); // dry signal (mostly same as oldSignal but may come from another bus)
+
+		signal = XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)); // mix filter output with dry signal
+		signal = Mix.ar([signal, oldSignal * max(through.varlag(fadeTime, start: 0), 1 - env)]);   // fade old input according to gate, signal is supposed to fade out itself.
+
 		this.addOutput(signal, offset);
 	}
 
 	// set quelle output
 	quelleOutput { |signal, argNumChannels, offset = 0|
-		var localMix, localInput, oldSignal;
+		var localMix, oldSignal;
 		argNumChannels = min(argNumChannels ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
 		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
 
+		// LFSaw.de: reordered to group thematical elements together
 		oldSignal = In.ar(outBus + offset, argNumChannels);          // previous signal on bus
-		localInput = this.quelleInput(argNumChannels, offset);
 
-		signal = XFade2.ar(oldSignal, signal + oldSignal, (mix * env) * 2 - 1);  // can't use Out here, because "in" can be different than "out"
-		FreeSelfWhenDone.kr(env);
+		signal = XFade2.ar(oldSignal, MulAdd(signal, env, oldSignal), MulAdd(mix, 2, -1));
+
+		FreeSelfWhenDone.kr(env);                                    // free synth if gate 0
 		this.addOutput(signal, offset);
 	}
 
@@ -127,7 +167,10 @@ StenoSignal {
 	writeToBus {
 		outputSignals !? {
 			outputSignals.keep(numChannels);
-			ReplaceOut.ar(outBus, outputSignals.keep(numChannels))
+			ReplaceOut.ar(outBus.varlag(
+				fadeTime, 
+				warp: \hold)
+			, outputSignals.keep(numChannels))
 		}
 	}
 

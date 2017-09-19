@@ -492,6 +492,26 @@ definitionlist::
 
 ##feedback (0)
 || An attenuverter ranging between -1.0 and 1.0. Its absolute value determines the amount feedback from the right-most declaration to the left-most. If negative, the feedback is phase-inverted.
+code::
+// Karplus-Strong
+(
+// a filter that creates an impulse
+t.filter(\i, {|in, ctls|
+  Dust2.ar(10) + DelayL.ar(in.reverse, 0.1, {Rand(0.001, 0.0005)}!2, 1)
+});
+
+// a variable
+t.declareVariables([0]);
+)
+
+// swap between one and more filters
+-- 0i0
+-- 0ii0
+
+// set feedback parameters (negative creates lower octave)
+t.set(\0, \feedback, 0.9)
+t.set(\0, \feedback, -0.9)
+::
 
 ##assignment (1)
 || The number of times a variable can be assigned in succession (left to right). If the number is reached, the signal is not altered anymore. Assigned signals are mixed down to one multichannel stream.
