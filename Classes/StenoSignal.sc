@@ -98,20 +98,21 @@ StenoSignal {
 		oldSignal = In.ar(outBus + offset, argNumChannels); // previous signal on bus
 		drySignal = In.ar(dryIn  + offset, argNumChannels); // dry signal (mostly same as oldSignal but may come from another bus)
 		tailSignal = In.ar(tailBus + offset, argNumChannels); // tails from replaced synths
-		
+
+		// TODO: if replace, set mix to 1
+
 		signal = Mix.ar([
-			  // mix filter output with dry signal if synth is not released
-			  // this part is supposed to fade out itself (envelope assigned at filter input)
-			signal,
+			  // mix filter output with dry signal
+			  // signal is supposed to fade out itself (envelope assigned at filter input)
+			XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)),
+
 			  // collect tails
-			tailSignal, 
-			
-			  // fade old signal according to 1-env 
+			tailSignal,
+
+			  // fade old signal according to 1-env
 			  // `through` is used to carry original signal in the parallel case
 			oldSignal * max(through, 1 - env)
 		]);
-		// assign mix if synth is not released
-		signal = XFade2.ar(drySignal, signal, MulAdd(max(mix, 1-gate), 2, -1));
 
 		this.addOutput(signal, offset);
 	}
@@ -129,7 +130,8 @@ StenoSignal {
 
 
 		signal = Mix.ar([
-			signal * env,
+			  // signal strength (mix) and envelope multiplication
+			signal * mix * env,
 
 			  // collect tails
 			tailSignal,
@@ -138,8 +140,6 @@ StenoSignal {
 			  // TODO: if release (not replace), continue mixing
 			oldSignal * gate
 		]);
-		// assign mix if synth is not released
-		signal = signal * max(mix, 1-gate);
 
 		FreeSelfWhenDone.kr(env);                                    // free synth if gate 0
 		this.addOutput(signal, offset);
