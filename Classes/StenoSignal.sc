@@ -83,7 +83,7 @@ StenoSignal {
 
 		// gating analysis
 		gateHappened = gate <= 0;
-		dcBlocked = LeakDC.ar(signal.sum);
+		dcBlocked = LeakDC.ar(Sanitize.ar(signal.sum));
 
 		// free synth if signal constant for fadeTime:
 		DetectSilence.ar(max(gate, dcBlocked), time: fadeTime, doneAction:2);
