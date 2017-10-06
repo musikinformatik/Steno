@@ -413,26 +413,28 @@ Steno {
 
 
 	declareVariables { |names|
+		var bus;
 		names.do { |name|
 			name = name.asSymbol;
 			if(variables[name].isNil) {
 				"new variable as ".post;
+				bus = Bus.audio(server, numChannels);
+
 				this.filter(name, { |input, controls|
 					var feedback = \feedback.kr(0);
-					var bus = Bus.audio(server, numChannels);
 					var in = XFade2.ar(
 						inA: In.ar(bus, numChannels),
-						inB: InFeedback.ar(bus, numChannels) * feedback.sign,
-						pan: feedback.abs.linlin(0, 1, -1, 1)
+						inB: Limiter.ar(InFeedback.ar(bus, numChannels), 8, 0.01) * feedback.sign,
+						// only do InFeedback for first appearance of variable
+						pan: (feedback.abs * (controls.index < 1) * 2 - 1)
 					);
-					variables[name].free; variables[name] = bus;
 
 					// \assignment can be increased for feeding in more than one signal
-					Out.ar(bus, input * (\tokenIndex.kr < \assignment.kr(1)));
+					Out.ar(bus, input * (controls.index < \assignment.kr(1)));
 
 					in * controls[\env] + input
-				})
-
+				});
+				variables[name] = bus;
 			} {
 				"Variable '%' already declared".format(name).warn;
 			}
