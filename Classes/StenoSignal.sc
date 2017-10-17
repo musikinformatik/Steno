@@ -1,7 +1,7 @@
 
 StenoSignal {
 	var <numChannels, <multiChannelExpand;
-	var <inBus, <outBus, <env, <gate, <fadeTime, fadeEnv, <attack, <mix, <through, <dryIn;
+	var <inBus, <outBus, <env, <gate, <fadeTime, fadeEnv, <attack, <mix, <through, <dryIn, <feedback;
 	var <tailBus; // holds tails of replaced synths
 	var <synthIndex, <index, <nestingDepth, <input, <controls;
 	var outputSignals;
@@ -32,6 +32,8 @@ StenoSignal {
 		index = \index.kr(0);
 		nestingDepth = \nestingDepth.kr(0);
 
+		feedback = \feedback.kr(0);
+
 		// see also StenoStack:updateControls
 		controls = (
 			index: index,
@@ -43,7 +45,8 @@ StenoSignal {
 			through: through,
 			env: env,
 			fadeTime: fadeTime,
-			attack: attack
+			attack: attack,
+			feedback: feedback
 		);
 	}
 

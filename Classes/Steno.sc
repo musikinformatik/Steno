@@ -419,7 +419,6 @@ Steno {
 				"new variable as ".post;
 
 				this.filter(name, { |input, controls|
-					var feedback = \feedback.kr(0);
 					// Bus declaration inside synth func restores busses with
 					// correct channel numbers, e.g. when number of channels changed on the fly
 					var bus = Bus.audio(server, numChannels);
