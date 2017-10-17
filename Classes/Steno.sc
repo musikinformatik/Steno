@@ -413,15 +413,16 @@ Steno {
 
 
 	declareVariables { |names|
-		var bus;
 		names.do { |name|
 			name = name.asSymbol;
 			if(variables[name].isNil) {
 				"new variable as ".post;
-				bus = Bus.audio(server, numChannels);
 
 				this.filter(name, { |input, controls|
 					var feedback = \feedback.kr(0);
+					// Bus declaration inside synth func restores busses with
+					// correct channel numbers, e.g. when number of channels changed on the fly
+					var bus = Bus.audio(server, numChannels);
 					var in = XFade2.ar(
 						inA: In.ar(bus, numChannels),
 						inB: Limiter.ar(InFeedback.ar(bus, numChannels), 8, 0.01) * feedback.sign,
