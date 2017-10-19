@@ -3,6 +3,7 @@ StenoSettings {
 	var <globalSettings, <synthSettings, <msgFuncs, <current;
 	var <>lexicalScope = true;
 	var stack;
+	var internalArgs = #[\in, \out, \dryIn, \through, \gate, \tailBus];
 
 	*new { ^super.new.init }
 
@@ -32,9 +33,9 @@ StenoSettings {
 	}
 
 	addSynthDef { |name, synthDef|
-		var a = "", b = "", excluding = #[\in, \out, \dryIn, \through, \gate], count = 0;
+		var a = "", b = "", count = 0;
 		synthDef.desc.controls.do { |c|
-			if(excluding.includes(c.name).not) {
+			if(internalArgs.includes(c.name).not) {
 				a = a ++ c.name ++ " = " ++ c.defaultValue ++ ", ";
 				b = b ++ "'%', %.value(controls ? ()), ".format(c.name, c.name);
 				count = count + 1;
