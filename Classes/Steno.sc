@@ -28,6 +28,9 @@ Steno {
 	}
 
 	init {
+		if(server.serverRunning.not) {
+			Error("server % not running".format(server)).throw
+		};
 		synthList = [];
 		argList = [];
 		variables = ();
