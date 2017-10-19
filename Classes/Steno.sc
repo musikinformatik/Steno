@@ -422,6 +422,7 @@ Steno {
 					// Bus declaration inside synth func restores busses with
 					// correct channel numbers, e.g. when number of channels changed on the fly
 					var bus = Bus.audio(server, numChannels);
+					var feedback = \feedback.kr(0); // for now, we take it in like this.
 					var in = XFade2.ar(
 						inA: In.ar(bus, numChannels),
 						inB: Limiter.ar(InFeedback.ar(bus, numChannels), 8, 0.01) * feedback.sign,
@@ -429,12 +430,16 @@ Steno {
 						pan: (feedback.abs * (controls.index < 1) * 2 - 1)
 					);
 
+					// if already allocated, free the old bus
+					variables[name].free;
+					variables[name] = bus;
+
 					// \assignment can be increased for feeding in more than one signal
 					Out.ar(bus, input * (controls.index < \assignment.kr(1)));
 
 					in * controls[\env] + input
 				});
-				variables[name] = bus;
+
 			} {
 				"Variable '%' already declared".format(name).warn;
 			}
