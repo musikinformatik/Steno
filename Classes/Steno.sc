@@ -421,7 +421,7 @@ Steno {
 				this.filter(name, { |input, controls|
 					// Bus declaration inside synth func restores busses with
 					// correct channel numbers, e.g. when number of channels changed on the fly
-					var bus = Bus.audio(server, numChannels).postln;
+					var bus = Bus.audio(server, numChannels);
 					var in = LinXFade2.ar(
 						inA: In.ar(bus, numChannels),
 						inB: Limiter.ar(InFeedback.ar(bus, numChannels), 8, 0.01),
