@@ -421,13 +421,13 @@ Steno {
 				this.filter(name, { |input, controls|
 					// Bus declaration inside synth func restores busses with
 					// correct channel numbers, e.g. when number of channels changed on the fly
-					var bus = Bus.audio(server, numChannels);
-					var in = XFade2.ar(
+					var bus = Bus.audio(server, numChannels).postln;
+					var in = LinXFade2.ar(
 						inA: In.ar(bus, numChannels),
-						inB: Limiter.ar(InFeedback.ar(bus, numChannels), 8, 0.01) * feedback.sign,
+						inB: Limiter.ar(InFeedback.ar(bus, numChannels), 8, 0.01),
 						// only do InFeedback for first appearance of variable
-						pan: (feedback.abs * (controls.index < 1) * 2 - 1)
-					);
+						pan: (controls.feedback.abs * (controls.index < 1) * 2 - 1)
+					) * controls.feedback.sign;
 
 					// \assignment can be increased for feeding in more than one signal
 					Out.ar(bus, input * (controls.index < \assignment.kr(1)));
