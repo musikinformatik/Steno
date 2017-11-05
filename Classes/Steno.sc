@@ -194,8 +194,6 @@ Steno {
 
 		server.openBundle;
 		protect {
-			if(string[0] == $!) { this.freeAll; string = cmdLine = string.drop(1) };
-			if(string.last == $!) { this.freeAll; string = cmdLine = string.drop(-1) };
 			if(verbosity > 0) { string.postcs };
 			diff.value(string)
 			//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
@@ -452,7 +450,7 @@ Steno {
 	// building synth defs
 
 	initSynthDefs {
-		var routingFunction, dummyOpeningFunction;
+		var routingFunction, dummyFunction, dummyOpeningFunction;
 		// we always go through a limiter here.
 
 		// LFSaw.de -- quite heavy processing and sound shaping, I'll rather reduce the signal (since there's likely lots of summation happening) and have the intended level up.
@@ -531,6 +529,10 @@ Steno {
 		}, force:true);
 		*/
 
+		dummyFunction = {
+			FreeSelf.kr(\gate.kr(1) < 1)
+		};
+
 
 		this.addSynthDef('(', routingFunction, force:true);
 
@@ -541,7 +543,9 @@ Steno {
 		this.addSynthDef(']', routingFunction, force:true);
 		this.addSynthDef('}', routingFunction, force:true);
 
-		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }, force:true); // if not found use this.
+
+		this.addSynthDef('!', dummyFunction, force:true);
+		this.addSynthDef('?', dummyFunction, force:true); // if not found use "?".
 
 	}
 
@@ -549,7 +553,7 @@ Steno {
 	addSynthDef { |name, func, update = true, updateSubgraph = false, force = false|
 		var def;
 		if(variables.at(name).notNil) { Error("The token '%' is declared as a variable already.".format(name)).throw };
-		if("()[]{}?".find(name.asString).notNil  and: { force.not }) {
+		if("()[]{}?!".find(name.asString).notNil  and: { force.not }) {
 			Error("The token '%' cannot be overridden.".format(name)).throw
 		};
 		encyclopedia = encyclopedia ? ();
@@ -624,13 +628,21 @@ Steno {
 				};
 			},
 			keepFunc: { |token, i|
-				var args;
+				var args, currentSynth, synth;
 				if(i >= synthList.size) {
 					"keepFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
 					args = this.calcNextArguments(token);
-					synthList.at(i).set(*args);
 					argList.put(i, args);
+					currentSynth = synthList.at(i);
+
+					if(argumentStack.replaceAll) {
+						synth = this.newSynth(token, i, args, currentSynth.nodeID); // place new synth after old
+						currentSynth.release;
+						synthList.put(i, synth);
+					} {
+						currentSynth.set(*args);
+					}
 				};
 			},
 			beginFunc: {
@@ -745,13 +757,11 @@ Steno {
 	*defaultPreProcessor {
 		^#{ |str, steno|
 
-			var newStr = str.class.new, doResend = false, currentClump = str.class.new, hasGap = false;
+			var newStr = str.class.new, currentClump = str.class.new, hasGap = false;
 
 			if(str.isNil) {
-				str = steno.cmdLine ? str.class.new; doResend = true;
+				str = steno.cmdLine ? str.class.new; // do resend?
 			} {
-				if(str.first == $!) { doResend = true; str = str.drop(1); };
-				if(str.last == $!) { doResend = true; str = str.drop(-1); };
 				str = str.replace("\n", " ");
 			};
 
@@ -794,7 +804,6 @@ Steno {
 			}, false, false); // todo: check if we can avoid double checking below
 			newStr = newStr ++ currentClump; // add rest.
 			newStr = newStr.replace(" ", "");
-			if(doResend) { newStr = "!" ++ newStr };
 
 			newStr
 		}
