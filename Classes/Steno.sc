@@ -712,6 +712,7 @@ Steno {
 			']', { settings.pop; argumentStack.endParallel;},
 			'{', { settings.push; argumentStack.beginStack; },
 			'}', { settings.pop; argumentStack.endStack; },
+			'!', { argumentStack.beginReplaceAll; },
 			// default case
 			{
 				controls = argumentStack.controls;

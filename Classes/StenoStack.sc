@@ -4,7 +4,7 @@ StenoStack {
 	var argStack;
 
 	var dryReadIndex = 0, readIndex = 0, writeIndex = 0, through = 0, <argumentIndex;
-	var nestingDepth = 0;
+	var nestingDepth = 0, replaceAll = false;
 
 
 	*new { |busIndices|
@@ -13,14 +13,14 @@ StenoStack {
 
 	push {
 		// save current args on stack
-		argStack = argStack.add([readIndex, writeIndex, dryReadIndex, through, argumentIndex]);
+		argStack = argStack.add([readIndex, writeIndex, dryReadIndex, through, argumentIndex, replaceAll]);
 		nestingDepth = nestingDepth + 1;
 	}
 
 	pop {
 		// set args for subsequent synths
 		if(nestingDepth < 1) { Error("inconsistent syntax. This should not happen").throw };
-		#readIndex, writeIndex, dryReadIndex, through, argumentIndex = argStack.pop;
+		#readIndex, writeIndex, dryReadIndex, through, argumentIndex, replaceAll = argStack.pop;
 		nestingDepth = nestingDepth - 1;
 	}
 
@@ -89,6 +89,10 @@ StenoStack {
 
 		^args
 
+	}
+
+	beginReplaceAll {
+		replaceAll = true;
 	}
 
 	beginStack {
