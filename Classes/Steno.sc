@@ -209,15 +209,19 @@ Steno {
 	}
 
 	resendSynths { |names| // names are symbols
+		var oldSynthList = synthList.copy;
+		var oldSynth;
+
 		// we use the one-to-one equivalence of synths and tokens
 		this.prevTokens.do { |token, i|
 			var newSynth, args;
 			if(names.isNil or: { names.includes(token) }) {
 				args = argList.at(i);
-				newSynth = this.newSynth(token, i, args);
+				oldSynth = oldSynthList.at(i);
+				newSynth = this.newSynth(token, nil, args, oldSynth.nodeID);
 				if(verbosity > 1) { ("replaced synth" + token).postln };
-				"releasing old synth with id: %".format(synthList.at(i)).postln;
-				synthList.at(i).release;
+				"releasing old synth with id: %".format(oldSynthList.at(i)).postln;
+				oldSynth.release;
 				synthList.put(i, newSynth);
 			}
 		}
@@ -632,7 +636,8 @@ Steno {
 		// LFSaw.de: if target not explicitely given (needed for replacement, to place new synth _after_ old):
 		// if first in list, add synth to encapsulating group
 		// otherwise add it after previous synth in list
-		target = target ?? {synthList[i - 1]};
+
+		target = target ?? { synthList[i - 1] };
 		addAction = if(target.isNil) {
 			target = group;
 			\addToHead
