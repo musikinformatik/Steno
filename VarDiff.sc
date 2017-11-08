@@ -32,14 +32,12 @@ VarDiff {
 		tokens.do({ | c | tokenArray = tokenArray.add(c) });
 		tokens = tokenArray;
 
-		// if (diffFunc.notNil) {
 		#deletions, newSynthList = diffFunc.value(prevTokens, tokens);
-		// }{
-		// #deletions, newSynthList = VarDiff.parseld(VarDiff.ld(prevTokens, tokens), prevTokens, tokens);
-		// };
 
 		// deletions: array of indices
-		// newSynthList: array of [sourceindex or nil, token], sorted by targetindex
+		// newSynthList: array of [ sourceindex|\newSynth, token ]
+		// 			and tokens[i] == newSynthList[i][1]
+
 		display =String.fill(prevTokens.size, $_);
 		deletions.do { | i | display[i] = prevTokens[i]};
 		display.postln;
@@ -54,18 +52,22 @@ VarDiff {
 		steno.synthList = Array(newSynthList.size);
 		steno.argList = Array(newSynthList.size);
 		beginFunc.value;
+		steno.server.makeBundle(steno.server.latency, {
 		deletions.do({ | i | curSynthList[i].release});
+		newSynthList.postln;
 		newSynthList.do { | atsi, i |
 			#si, token = atsi;
+				[i, steno.synthList].postln;
 			args = steno.calcNextArguments(token);
+
 			if (si == \newSynth) {
 				synth = steno.newSynth(token, i, args);
 			} {
 				synth = curSynthList[si];
 				synth.set(*args);
-				target = curSynthList[si -1];
+				target = steno.synthList[i-1];
 				if(target.notNil) {
-					synth.moveAfter(curSynthList[si -1]);
+					synth.moveAfter(steno.synthList[i -1]);
 				} {
 					synth.moveToHead(steno.group);
 				};
@@ -73,6 +75,7 @@ VarDiff {
 			steno.synthList.add(synth);
 			steno.argList.add(args);
 		};
+		});
 		returnFunc.value;
 	}
 
@@ -206,7 +209,8 @@ t.quelle(\b, { Saw.ar(Rand(400, 700)) * 0.2 });
 t.filter(\f, { |input| CombL.ar(input, 0.2, Rand(0.01, 0.02), Rand(0.4, 2) ) });
 t.diff.diff0;
 t.value("!faa"); ""
-t.value("faaf"); ""
+
+t.value("aafbaaf"); ""
 t.value("faaf"); ""
 t.value("faaf"); ""
 t.diff.diff1;
@@ -221,11 +225,14 @@ t.value("faa"); ""
 t.value("aaf"); ""
 t.synthList
 )
-t.value("babaffffbbb");
+t.value("baba ffffbbb");
 t.value("aaaafa");
 t.value("(aaf)(aaf)bb");
 
 t.value("")
 
-*/
+s.makeWindow
+s.scope
+s.queryAllNodes
 
+*/
