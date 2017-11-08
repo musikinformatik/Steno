@@ -11,7 +11,7 @@ Steno {
 	var <>verbosity = 1; // 0, 1, 2.
 	var <group;
 
-	var argumentStack;
+	var <argumentStack;
 
 	classvar <>current;
 

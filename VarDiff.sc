@@ -63,8 +63,16 @@ VarDiff {
 			if (si == \newSynth) {
 				synth = steno.newSynth(token, i, args);
 			} {
-				synth = curSynthList[si];
-				synth.set(*args);
+				if(steno.argumentStack.replaceAll) {
+					synth = steno.newSynth(token, i, args, curSynthList[si].nodeID); // place new synth after old
+					curSynthList[si].release;
+				} {
+					synth = curSynthList[si];
+					synth.set(*args);
+				};
+
+				// synth = curSynthList[si];
+				// synth.set(*args);
 				target = steno.synthList[i-1];
 				if(target.notNil) {
 					synth.moveAfter(steno.synthList[i -1]);
@@ -72,6 +80,7 @@ VarDiff {
 					synth.moveToHead(steno.group);
 				};
 			};
+
 			steno.synthList.add(synth);
 			steno.argList.add(args);
 		};
@@ -212,7 +221,7 @@ t.value("!faa"); ""
 
 t.value("aafbaaf"); ""
 t.value("faaf"); ""
-t.value("faaf"); ""
+t.value("aaf"); ""
 t.diff.diff1;
 t.value("faa"); ""
 t.value("aaf"); ""
@@ -228,6 +237,8 @@ t.synthList
 t.value("baba ffffbbb");
 t.value("aaaafa");
 t.value("(aaf)(aaf)bb");
+t.value("!(aaf)(aaf)bb");
+t.value("(!aaf)(aaf)bb");
 
 t.value("")
 
