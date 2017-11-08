@@ -194,8 +194,6 @@ Steno {
 
 		server.openBundle;
 		protect {
-			if(string[0] == $!) { this.freeAll; string = cmdLine = string.drop(1) };
-			if(string.last == $!) { this.freeAll; string = cmdLine = string.drop(-1) };
 			if(verbosity > 0) { string.postcs };
 			diff.value(string)
 			//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
@@ -211,15 +209,19 @@ Steno {
 	}
 
 	resendSynths { |names| // names are symbols
+		var oldSynthList = synthList.copy;
+		var oldSynth;
+
 		// we use the one-to-one equivalence of synths and tokens
 		this.prevTokens.do { |token, i|
 			var newSynth, args;
 			if(names.isNil or: { names.includes(token) }) {
 				args = argList.at(i);
-				newSynth = this.newSynth(token, i, args);
+				oldSynth = oldSynthList.at(i);
+				newSynth = this.newSynth(token, nil, args, oldSynth.nodeID);
 				if(verbosity > 1) { ("replaced synth" + token).postln };
-				"releasing old synth with id: %".format(synthList.at(i)).postln;
-				synthList.at(i).release;
+				"releasing old synth with id: %".format(oldSynthList.at(i)).postln;
+				oldSynth.release;
 				synthList.put(i, newSynth);
 			}
 		}
@@ -286,56 +288,6 @@ Steno {
 
 			}
 		}
-	}
-
-	// this represents the structure of the actual implementation
-	// not complete
-
-	plotStructure { |title = "untitled"|
-		var window, run = true;
-		var in, out, prevNode, curNode;
-		window = Window(title);
-		window.background = Color.black;
-		window.onClose = { run = false };
-		window.drawFunc = {
-			var prevNodes = Array.newClear(busIndices.size);
-			synthList.do { |synth, i|
-				var nodeSize = 20;
-				var args = argList.at(i);
-				var name = this.removePrefix(synth.defName);
-				var mul = Point(
-					window.bounds.width - (nodeSize * 2) / busIndices.size,
-					window.bounds.height - (nodeSize * 2) / synthList.size
-				);
-				if(args.isEmpty.not and: { name != ')' }) {
-					in = busIndices.indexOf(args[1]);
-					//in = busIndices.indexOf(args[5]);
-					out = busIndices.indexOf(args[3]);
-				} {
-					out = out ? 0;
-					in = in ? in;
-				};
-				prevNode = prevNodes[in];
-				curNode = Point(out + 1, i + 1) * mul;
-				prevNodes[out] = curNode;
-				Pen.color = Color.white;
-				Pen.moveTo(curNode);
-				Pen.addOval(Rect.aboutPoint(curNode, nodeSize, nodeSize));
-				Pen.moveTo(curNode);
-				if(name != '?') { Pen.stringAtPoint(name, curNode, Font.sansSerif(nodeSize)) };
-				Pen.moveTo(curNode);
-				prevNode !? { Pen.lineTo(prevNode) };
-			};
-			Pen.stroke;
-		};
-		{ while { run } { window.refresh; 0.05.wait; } }.fork(AppClock)
-		^window.front;
-	}
-
-	dotStructure { |title, attributes, labelAttributes|
-		attributes = attributes ?? { "rankdir=LR;\nfontname=Courier;\nlabel=\"\n\n%\"".format(cmdLine) };
-		labelAttributes = labelAttributes ?? { "fontname=Courier" };
-		^this.cmdLine.stenoDotStructure(title ? cmdLine, attributes, variables.keys, operators, labelAttributes)
 	}
 
 
@@ -452,7 +404,7 @@ Steno {
 	// building synth defs
 
 	initSynthDefs {
-		var routingFunction, dummyOpeningFunction;
+		var routingFunction, dummyFunction, dummyOpeningFunction;
 		// we always go through a limiter here.
 
 		// LFSaw.de -- quite heavy processing and sound shaping, I'll rather reduce the signal (since there's likely lots of summation happening) and have the intended level up.
@@ -531,6 +483,10 @@ Steno {
 		}, force:true);
 		*/
 
+		dummyFunction = {
+			FreeSelf.kr(\gate.kr(1) < 1)
+		};
+
 
 		this.addSynthDef('(', routingFunction, force:true);
 
@@ -541,7 +497,9 @@ Steno {
 		this.addSynthDef(']', routingFunction, force:true);
 		this.addSynthDef('}', routingFunction, force:true);
 
-		this.addSynthDef('?', { FreeSelf.kr(\gate.kr(1) < 1); }, force:true); // if not found use this.
+
+		this.addSynthDef('!', dummyFunction, force:true);
+		this.addSynthDef('?', dummyFunction, force:true); // if not found use "?".
 
 	}
 
@@ -549,7 +507,7 @@ Steno {
 	addSynthDef { |name, func, update = true, updateSubgraph = false, force = false|
 		var def;
 		if(variables.at(name).notNil) { Error("The token '%' is declared as a variable already.".format(name)).throw };
-		if("()[]{}?".find(name.asString).notNil  and: { force.not }) {
+		if("()[]{}?!".find(name.asString).notNil  and: { force.not }) {
 			Error("The token '%' cannot be overridden.".format(name)).throw
 		};
 		encyclopedia = encyclopedia ? ();
@@ -624,13 +582,21 @@ Steno {
 				};
 			},
 			keepFunc: { |token, i|
-				var args;
+				var args, currentSynth, synth;
 				if(i >= synthList.size) {
 					"keepFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
 					args = this.calcNextArguments(token);
-					synthList.at(i).set(*args);
 					argList.put(i, args);
+					currentSynth = synthList.at(i);
+
+					if(argumentStack.replaceAll) {
+						synth = this.newSynth(token, i, args, currentSynth.nodeID); // place new synth after old
+						currentSynth.release;
+						synthList.put(i, synth);
+					} {
+						currentSynth.set(*args);
+					}
 				};
 			},
 			beginFunc: {
@@ -670,7 +636,8 @@ Steno {
 		// LFSaw.de: if target not explicitely given (needed for replacement, to place new synth _after_ old):
 		// if first in list, add synth to encapsulating group
 		// otherwise add it after previous synth in list
-		target = target ?? {synthList[i - 1]};
+
+		target = target ?? { synthList[i - 1] };
 		addAction = if(target.isNil) {
 			target = group;
 			\addToHead
@@ -712,6 +679,7 @@ Steno {
 			']', { settings.pop; argumentStack.endParallel;},
 			'{', { settings.push; argumentStack.beginStack; },
 			'}', { settings.pop; argumentStack.endStack; },
+			'!', { argumentStack.beginReplaceAll; },
 			// default case
 			{
 				controls = argumentStack.controls;
@@ -744,13 +712,11 @@ Steno {
 	*defaultPreProcessor {
 		^#{ |str, steno|
 
-			var newStr = str.class.new, doResend = false, currentClump = str.class.new, hasGap = false;
+			var newStr = str.class.new, currentClump = str.class.new, hasGap = false;
 
 			if(str.isNil) {
-				str = steno.cmdLine ? str.class.new; doResend = true;
+				str = steno.cmdLine ? str.class.new; // do resend?
 			} {
-				if(str.first == $!) { doResend = true; str = str.drop(1); };
-				if(str.last == $!) { doResend = true; str = str.drop(-1); };
 				str = str.replace("\n", " ");
 			};
 
@@ -793,7 +759,6 @@ Steno {
 			}, false, false); // todo: check if we can avoid double checking below
 			newStr = newStr ++ currentClump; // add rest.
 			newStr = newStr.replace(" ", "");
-			if(doResend) { newStr = "!" ++ newStr };
 
 			newStr
 		}
