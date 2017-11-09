@@ -52,17 +52,7 @@ StenoSignal {
 
 	// get filter input
 	filterInput { |argNumChannels, offset = 0|
-		var sig;
-
-		sig = In.ar(inBus, numChannels).asArray.drop(offset);
-
-		if(argNumChannels.notNil) {
-			sig = sig.keep(argNumChannels);
-			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
-		};
-
-
-		^(sig * env)
+		^this.quelleInput(argNumChannels, offset) * env
 	}
 
 	// get quelle input
