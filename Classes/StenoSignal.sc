@@ -46,7 +46,11 @@ StenoSignal {
 			env: env,
 			fadeTime: fadeTime,
 			attack: attack,
-			feedback: feedback
+			feedback: feedback,
+			fb: feedback,
+			dpth: nestingDepth,
+			idx: index,
+			sidx: synthIndex
 		);
 	}
 
