@@ -97,7 +97,7 @@ StenoSignal {
 		signal = Mix.ar([
 			  // mix filter output with dry signal
 			  // signal is supposed to fade out itself (envelope assigned at filter input)
-			XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)),
+			XFade2.ar(oldSignal, signal, MulAdd(mix, 2, -1)),
 
 			  // collect tails
 			tailSignal,
