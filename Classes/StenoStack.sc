@@ -34,12 +34,13 @@ StenoStack {
 		argumentIndex !? { writeIndex = writeIndex + argumentIndex };
 		argumentIndex = nil;
 
-		args = this.getBusArgs(readIndex, writeIndex, readIndex, 0, argumentIndex); // no through
+		args = this.getBusArgs(readIndex, writeIndex, dryReadIndex, 0, argumentIndex); // no through
 
 		// set args for subsequent synths
-		dryReadIndex = readIndex;
+		dryReadIndex = writeIndex;
 		readIndex = writeIndex;
 		through = 0.0;
+
 		^args
 	}
 
