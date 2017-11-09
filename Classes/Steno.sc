@@ -419,8 +419,9 @@ Steno {
 		names.do { |name|
 			name = name.asSymbol;
 			if(variables[name].isNil) {
-				"new variable as ".post;
-
+				if(verbosity > 0) {
+					"new variable as ".post;
+				};
 				this.filter(name, { |input, controls|
 					// Bus declaration inside synth func restores busses with
 					// correct channel numbers, e.g. when number of channels changed on the fly
