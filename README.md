@@ -1,5 +1,3 @@
-**Note**: The work on this is currently done via this fork: https://github.com/musikinformatik/Steno
-
 # Steno
 A little language for spinning long strings of synths
 
