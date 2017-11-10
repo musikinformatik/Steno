@@ -5,11 +5,11 @@ Steno {
 	var <>quant, <settings;
 	var <encyclopedia, <operators;
 	var <monitor, <diff;
-	var <busIndices, <synthList, <argList, <variables;
+	var <busIndices, <variables;
 	var <tailBus;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
-	var <group;
+	var <synthList;
 
 	var argumentStack;
 
@@ -31,11 +31,10 @@ Steno {
 		if(server.serverRunning.not) {
 			Error("server % not running".format(server)).throw
 		};
-		synthList = [];
-		argList = [];
 		variables = ();
 		operators = ();
 		settings = StenoSettings.new;
+		synthList = StenoSynthList.new(server);
 		this.initBusses;
 		this.initDiff;
 		this.initSynthDefs;
@@ -78,9 +77,7 @@ Steno {
 
 	cmdPeriod {
 		diff.init;
-		synthList = [];
-		argList = [];
-		group = nil;
+		synthList.freeAll;
 	}
 
 	set { |name ... keyValuePairs|
@@ -134,14 +131,18 @@ Steno {
 		this.rebuild;
 	}
 
+	group {
+		^synthList.group
+	}
+
 	rebuild {
 		fork {
 			this.initBusses;
 			this.rebuildSynthDefs;
 			server.sync;
 			this.sched {
-				this.startGroup;
-				this.resendSynths;
+				synthList.startGroup;
+				synthList.resendSynths;
 				this.startMonitor(restart: true);
 			}
 		}
@@ -153,7 +154,7 @@ Steno {
 			this.initBusses;
 			this.rebuildSynthDefs;
 			server.sync;
-			this.startGroup;
+			synthList.startGroup;
 			this.value(rawCmdLine);
 			this.startMonitor(restart: true);
 		}
@@ -161,14 +162,14 @@ Steno {
 
 	freeAll {
 		diff.init;
-		synthList.do(_.release);
+		synthList.freeAll;
 		this.releaseHanging;
-		synthList = [];
-		argList = [];
 	}
 
 	releaseHanging {
-		if(server.serverRunning and: { group.notNil }) { server.sendMsg("/n_set", group.nodeID, \steno_unhang, 1.0) };
+		if(server.serverRunning and: { this.group.notNil }) {
+			server.sendMsg("/n_set", this.group.nodeID, \steno_unhang, 1.0)
+		}
 	}
 
 	value { |string|
@@ -198,8 +199,6 @@ Steno {
 			if(string.last == $!) { this.freeAll; string = cmdLine = string.drop(-1) };
 			if(verbosity > 0) { string.postcs };
 			diff.value(string)
-			//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
-			// if we use this one, we should use events instead of synths. then alsoprevTokens needs to be changed.
 		} {
 			server.closeBundle(server.latency);
 		}
@@ -210,23 +209,21 @@ Steno {
 		^diff.prevTokens.collect { |x| x.asSymbol }
 	}
 
-	resendSynths { |names| // names are symbols
-		// we use the one-to-one equivalence of synths and tokens
-		this.prevTokens.do { |token, i|
-			var newSynth, args;
-			if(names.isNil or: { names.includes(token) }) {
-				args = argList.at(i);
-				newSynth = this.newSynth(token, i, args);
-				if(verbosity > 1) { ("replaced synth" + token).postln };
-				"releasing old synth with id: %".format(synthList.at(i)).postln;
-				synthList.at(i).release;
-				synthList.put(i, newSynth);
-			}
-		}
+	asSynthName { |token|
+		if(encyclopedia.at(token.asSymbol).isNil) { token = "?" };
+		^this.prefix(token)
 	}
 
-	startGroup {
-		group = group ?? {Group(server)};
+	prefix { |key|
+		^format("%_%", key, this.identityHash).asSymbol
+	}
+
+	removePrefix { |key|
+		^key.asString.split($_).at(0).asSymbol
+	}
+
+	resendSynths { |names| // names are symbols
+		synthList.resendSynths(names.collect { |token| this.prefix(token) })
 	}
 
 	startMonitor { |restart = false|
@@ -236,7 +233,7 @@ Steno {
 		};
 		monitor = Synth(this.prefix(\monitor),
 			[\out, bus ? 0, \in, busIndices.first, \amp, 0.1],
-			target: group,
+			target: this.group,
 			addAction:\addAfter
 		).register;
 
@@ -256,15 +253,16 @@ Steno {
 			busIndices = busIndices + (0, numChannels .. (n-1));
 		}
 	}
+
 	//////////////////// getting information about the resulting synth graph ////////////
 
 	dumpStructure { |postDryIn = false|
 		var header = String.fill(maxBracketDepth + 4, $-);
 		var findBus = { |bus| busIndices.indexOf(bus) };
 		header = [header, "  %  ", header, "\n"].join;
-		argList.do { |args, i|
+		synthList.arguments.do { |args, i|
 			var in, out, dryIn, token, arity;
-			token = this.removePrefix(synthList.at(i).defName);
+			token = this.removePrefix(synthList.getName(i));
 			header.postf(token);
 			args = args.keep(-10); // keep the last 5 pairs which are the ones that were added by SynthStack
 
@@ -288,6 +286,7 @@ Steno {
 		}
 	}
 
+
 	// this represents the structure of the actual implementation
 	// not complete
 
@@ -299,9 +298,9 @@ Steno {
 		window.onClose = { run = false };
 		window.drawFunc = {
 			var prevNodes = Array.newClear(busIndices.size);
-			synthList.do { |synth, i|
+			synthList.synths.do { |synth, i|
 				var nodeSize = 20;
-				var args = argList.at(i);
+				var args = synthList.argList.at(i);
 				var name = this.removePrefix(synth.defName);
 				var mul = Point(
 					window.bounds.width - (nodeSize * 2) / busIndices.size,
@@ -351,7 +350,7 @@ Steno {
 			stenoSignal.filter(func, multiChannelExpand ? expand, signalNumChannels);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new filter: \"%\" with % channels\n").postf(name, signalNumChannels) };
-		}, update);
+		}, update)
 	}
 
 	quelle { |name, func, multiChannelExpand, update = true, numChannels|
@@ -363,7 +362,7 @@ Steno {
 			stenoSignal.quelle(func, multiChannelExpand ? expand, signalNumChannels);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new quelle: \"%\" with % channels\n").postf(name, signalNumChannels) };
-		}, update);
+		}, update)
 	}
 
 	// TODO: shapes etc.
@@ -376,7 +375,7 @@ Steno {
 			func.value(stenoSignal.input, stenoSignal); // pass the signal object here, so func can use it
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new struktur: \"%\" with % channels\n").postf(name, signalNumChannels) };
-		}, update);
+		}, update)
 	}
 
 	operator { |name, func, arity = 2, multiChannelExpand, update = true|
@@ -584,43 +583,27 @@ Steno {
 		};
 	}
 
-	prefix { |key|
-		^format("%_%", key, this.identityHash).asSymbol
-	}
 
-	removePrefix { |key|
-		^key.asString.split($_).at(0).asSymbol
-	}
 
 	//  specify the diff algorithm
 
 	initDiff {
 		diff = DiffString(
 			insertFunc: { |token, i|
-				var args = this.calcNextArguments(token);
-				var synth = this.newSynth(token, i, args);
-				synthList = synthList.insert(i, synth);
-				argList = argList.insert(i, args);
+				synthList.insert(i, this.asSynthName(token), this.calcNextArguments(token));
 			},
 			removeFunc: { |token, i|
 				if(i >= synthList.size) {
 					"removeFunc: some inconsistency appeared, nothing to see here, keep going ...".warn;
 				} {
-					synthList.removeAt(i).release;
-					argList.removeAt(i);
+					synthList.removeAt(i)
 				};
 			},
 			swapFunc: { |token, i|
-				var synth, args, currentSynth;
 				if(i >= synthList.size) {
 					"swapFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
-					args = this.calcNextArguments(token);
-					currentSynth = synthList.at(i);
-					synth = this.newSynth(token, i, args, currentSynth.nodeID); // place new synth after old
-					currentSynth.release;
-					synthList.put(i, synth);
-					argList.put(i, args);
+					synthList.put(i, this.asSynthName(token), this.calcNextArguments(token));
 				};
 			},
 			keepFunc: { |token, i|
@@ -628,15 +611,13 @@ Steno {
 				if(i >= synthList.size) {
 					"keepFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
-					args = this.calcNextArguments(token);
-					synthList.at(i).set(*args);
-					argList.put(i, args);
+					synthList.set(i, *this.calcNextArguments(token))
 				};
 			},
 			beginFunc: {
 				if(server.serverRunning.not) { Error("server not running").throw };
 				this.initArguments;
-				this.startGroup;
+				synthList.startGroup;
 				// add a limiter to the end of the signal chain
 				this.startMonitor;
 			},
@@ -660,35 +641,6 @@ Steno {
 		}
 	}
 
-	///////////////////////////////////
-	// create new synth from token
-	///////////////////////////////////
-
-	newSynth { |token, i, args, target|
-		var addAction;
-
-		// LFSaw.de: if target not explicitely given (needed for replacement, to place new synth _after_ old):
-		// if first in list, add synth to encapsulating group
-		// otherwise add it after previous synth in list
-		target = target ?? {synthList[i - 1]};
-		addAction = if(target.isNil) {
-			target = group;
-			\addToHead
-		} {
-			\addAfter
-		};
-
-
-		token = token.asSymbol;
-		if(encyclopedia.at(token).isNil) { token = '?' }; // silent
-
-		^Synth(
-			this.prefix(token),
-			args,
-			target: target,
-			addAction: addAction
-		)
-	}
 
 	////////////////////////////////////////////////////////
 	// function used to step through the syntactic structure
