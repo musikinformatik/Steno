@@ -52,17 +52,7 @@ StenoSignal {
 
 	// get filter input
 	filterInput { |argNumChannels, offset = 0|
-		var sig;
-
-		sig = In.ar(inBus, numChannels).asArray.drop(offset);
-
-		if(argNumChannels.notNil) {
-			sig = sig.keep(argNumChannels);
-			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
-		};
-
-
-		^(sig * env)
+		^this.quelleInput(argNumChannels, offset) * env
 	}
 
 	// get quelle input
@@ -107,7 +97,7 @@ StenoSignal {
 		signal = Mix.ar([
 			  // mix filter output with dry signal
 			  // signal is supposed to fade out itself (envelope assigned at filter input)
-			XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)),
+			XFade2.ar(oldSignal, signal, MulAdd(mix, 2, -1)),
 
 			  // collect tails
 			tailSignal,
