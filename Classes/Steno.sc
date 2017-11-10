@@ -311,13 +311,15 @@ Steno {
 					in = busIndices.indexOf(args[1]);
 					//in = busIndices.indexOf(args[5]);
 					out = busIndices.indexOf(args[3]);
-				} {
-					out = out ? 0;
-					in = in ? in;
 				};
+
+				out = out ? 0;
+				in = in ? 0; // 0 sure?
+
 				prevNode = prevNodes[in];
 				curNode = Point(out + 1, i + 1) * mul;
 				prevNodes[out] = curNode;
+
 				Pen.color = Color.white;
 				Pen.moveTo(curNode);
 				Pen.addOval(Rect.aboutPoint(curNode, nodeSize, nodeSize));
@@ -325,6 +327,7 @@ Steno {
 				if(name != '?') { Pen.stringAtPoint(name, curNode, Font.sansSerif(nodeSize)) };
 				Pen.moveTo(curNode);
 				prevNode !? { Pen.lineTo(prevNode) };
+
 			};
 			Pen.stroke;
 		};
