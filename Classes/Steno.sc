@@ -268,7 +268,7 @@ Steno {
 			var in, out, dryIn, token, arity;
 			token = this.removePrefix(synthList.at(i).defName);
 			header.postf(token);
-			args = args.keep(-8); // keep the last 4 pairs which are the ones that were added by SynthStack
+			args = args.keep(-10); // keep the last 5 pairs which are the ones that were added by SynthStack
 
 			if(args.isEmpty.not) {
 				in = findBus.(args[1]);
@@ -289,7 +289,6 @@ Steno {
 			}
 		}
 	}
-
 
 	///////////////// wrappers for UGen functions ///////////////////////
 
