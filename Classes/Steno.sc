@@ -446,7 +446,11 @@ Steno {
 			]);   // fade old input according to gate, signal is supposed to fade out itself.
 
 			FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
-			ReplaceOut.ar(stenoSignal.inBus, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
+
+			// clean up: overwrite channel with zero.
+			// probably not needed, because fresh signal overwrites it anyhow.
+			// I leave the corrected implementation here, in case it turns out we still need it
+			// XOut.ar(stenoSignal.inBus, stenoSignal.gate, Silent.ar(numChannels));
 
 			stenoSignal.addOutput(signal);
 			stenoSignal.writeToBus;
