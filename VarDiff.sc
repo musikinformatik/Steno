@@ -30,11 +30,19 @@ VarDiff {
 		this.diff0;
 	}
 
-	value { | tokens |
-		var curSynthList, deletions, newSynthList, newArgList, display;
-		var token, si;
-		var synth, args, target;
+	display { |tokens, deletions, newSynthList|
+		var display = String.fill(prevTokens.size, $_);
+		deletions.do { | i | display[i] = prevTokens[i] };
+		display.postln;
+		display = tokens.collect { | token, i |
+			var synthIndex = newSynthList[i].first;
+			if (synthIndex == \newSynth) { token } { token.toUpper }
+		};
+		display.postln;
+	}
 
+	value { | tokens |
+		var curSynthList, deletions, newSynthList;
 		tokens = tokens.as(Array);
 
 		#deletions, newSynthList = diffFunc.value(prevTokens, tokens);
@@ -43,16 +51,7 @@ VarDiff {
 		// newSynthList: array of [ sourceindex|\newSynth, token ]
 		// 			and tokens[i] == newSynthList[i][1]
 
-		display = String.fill(prevTokens.size, $_);
-		deletions.do { | i | display[i] = prevTokens[i]};
-		display.postln;
-		prevTokens = tokens;
-		display = String(newSynthList.size);
-
-		newSynthList.do { | vals, i |
-			if (vals[0].isNumber) { display.add(tokens[i].toUpper) } { display.add(tokens[i]) }
-		};
-		display.postln;
+		this.display(tokens, deletions, newSynthList);
 
 		curSynthList = steno.synthList;
 		steno.synthList = Array(newSynthList.size);
@@ -60,22 +59,24 @@ VarDiff {
 		beginFunc.value;
 		steno.server.makeBundle(steno.server.latency, {
 
-			deletions.do({ | i | curSynthList[i].release});
+			deletions.do { | i | curSynthList[i].release };
 			newSynthList.postln;
 
-			newSynthList.do { | atsi, i |
-				#si, token = atsi;
+			newSynthList.do { | pair, i |
+				var token, synthIndex;
+				var synth, args, target;
+				#synthIndex, token = pair;
 				[i, steno.synthList].postln;
 				args = steno.calcNextArguments(token);
 
-				if (si == \newSynth) {
+				if (synthIndex == \newSynth) {
 					synth = steno.newSynth(token, i, args);
 				} {
 					if(steno.argumentStack.replaceAll) {
-						synth = steno.newSynth(token, i, args, curSynthList[si].nodeID); // place new synth after old
-						curSynthList[si].release;
+						synth = steno.newSynth(token, i, args, curSynthList[synthIndex].nodeID); // place new synth after old
+						curSynthList[synthIndex].release;
 					} {
-						synth = curSynthList[si];
+						synth = curSynthList[synthIndex];
 						synth.set(*args);
 					};
 
@@ -93,6 +94,7 @@ VarDiff {
 		});
 
 		returnFunc.value;
+		prevTokens = tokens;
 	}
 
 	// levenshtein distance,
