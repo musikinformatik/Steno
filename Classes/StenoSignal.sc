@@ -1,5 +1,6 @@
 
 StenoSignal {
+
 	var <numChannels, <multiChannelExpand;
 	var <inBus, <outBus, <env, <gate, <fadeTime, fadeEnv, <attack, <mix, <through, <dryIn, <feedback;
 	var <tailBus; // holds tails of replaced synths
