@@ -82,7 +82,7 @@ VarDiff {
 
 					target = steno.synthList[i-1];
 					if(target.notNil) {
-						synth.moveAfter(steno.synthList[i -1]);
+						synth.moveAfter(target);
 					} {
 						synth.moveToHead(steno.group);
 					};
@@ -135,16 +135,16 @@ VarDiff {
 		} {
 			// hack in a preference for contiguous characters
 			// so txtest -> test takes txTEST rather than TxtEST
-			if (source[spos-1] == target[tpos-1]) {
+			if (source[spos - 1] == target[tpos - 1]) {
 				spos = spos - 1;
 				tpos = tpos - 1;
 				tokenPairs.add([spos, source[spos]]);
 			} {
-				if (table[spos - 1][tpos] <= table[spos][tpos-1]) {
+				if (table[spos - 1][tpos] <= table[spos][tpos - 1]) {
 					spos = spos - 1;
 					deletions.add(spos)
 				} {
-					tpos = tpos -1;
+					tpos = tpos - 1;
 					tokenPairs.add([\newSynth, target[tpos]])
 				};
 			};
@@ -152,7 +152,7 @@ VarDiff {
 
 		// now get the leftovers, which will be either in the source or the target
 		spos.reverseDo { | i | deletions = deletions.add(i) };
-		tpos.reverseDo {|i| tokenPairs = tokenPairs.add([\newSynth, target[i]]) };
+		tpos.reverseDo { | i | tokenPairs = tokenPairs.add([\newSynth, target[i]]) };
 
 		^[deletions.reverse, tokenPairs.reverse]
 	}
@@ -182,10 +182,9 @@ VarDiff {
 			prevTokens= prevTokens.reverse;
 			tokens = tokens.reverse;
 			#d, n = VarDiff.parseld(VarDiff.ld(prevTokens, tokens), prevTokens, tokens);
-			d = s - d;
-			n = n.collect { | pr | [s - pr[0], pr[1] ] };
+			n = n.collect { | pr | [s - pr[0], pr[1]] };
 			n = n.reverse;
-			[d,n]
+			[s - d, n]
 		}
 	}
 
@@ -200,7 +199,7 @@ VarDiff {
 			};
 			d = Array(prevTokens.size);
 			prevPos.do(d.add(_));
-			[d.flat,n]
+			[d.flat, n]
 		}
 	}
 
@@ -215,10 +214,12 @@ VarDiff {
 			};
 			d = Array(prevTokens.size);
 			prevPos.do(d.add(_) );
-			[d.flat,n]
+			[d.flat, n]
 		}
 	}
 }
+
+
 /*
 VarDiff.parse(VarDiff.ld("rabcd", ""), "rabcd", "").do(_.postln)
 
