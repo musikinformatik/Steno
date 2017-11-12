@@ -140,18 +140,18 @@ StenoSignal {
 	}
 
 	// unique filter definition
-	filter { |func, multiChannelExpand, argNumChannels|
+	filter { |func, argMultiChannelExpand, argNumChannels|
 		var inputSignal = this.filterInput;
-		var signal = this.valueUGenFunc(func, inputSignal, multiChannelExpand, argNumChannels);
+		var signal = this.valueUGenFunc(func, inputSignal, argMultiChannelExpand, argNumChannels);
 		if(signal.notNil) {
 			this.filterOutput(signal, signal.size);
 		}
 	}
 
 	// unique quelle definition
-	quelle { |func, multiChannelExpand, argNumChannels|
+	quelle { |func, argMultiChannelExpand, argNumChannels|
 		var inputSignal = this.quelleInput;
-		var signal = this.valueUGenFunc(func, inputSignal, multiChannelExpand, argNumChannels);
+		var signal = this.valueUGenFunc(func, inputSignal, argMultiChannelExpand, argNumChannels);
 		if(signal.notNil) {
 			this.quelleOutput(signal, signal.size)
 		}
@@ -184,7 +184,7 @@ StenoSignal {
 		}
 	}
 
-	valueUGenFunc { |func, inputSignal, multiChannelExpand, argNumChannels|
+	valueUGenFunc { |func, inputSignal, argMultiChannelExpand, argNumChannels|
 		var output, size;
 
 		output = func.value(inputSignal, controls);
@@ -193,8 +193,13 @@ StenoSignal {
 		output = output.asArray;
 		size = output.size;
 
-		if(multiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
-			output = ({ func.value(inputSignal, controls) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
+		// if none are given, use defaults, that is, all channels
+		argNumChannels = argNumChannels ? numChannels;
+		argMultiChannelExpand = argMultiChannelExpand ? multiChannelExpand;
+
+		if(argMultiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
+			output = { func.value(inputSignal, controls) } ! (argNumChannels div: size).max(1);
+			output = output.flatten(1).keep(argNumChannels);
 		};
 
 		output = output.collect { |x| if(x.rate !== \audio) { K2A.ar(x) } { x } };  // convert output rate if necessary

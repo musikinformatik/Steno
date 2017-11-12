@@ -297,8 +297,8 @@ Steno {
 		this.addSynthDef(name, {
 			var stenoSignal, signalNumChannels;
 			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
-			stenoSignal = StenoSignal(signalNumChannels);
-			stenoSignal.filter(func, multiChannelExpand ? expand, signalNumChannels);
+			stenoSignal = StenoSignal(signalNumChannels,  multiChannelExpand ? expand);
+			stenoSignal.filter(func);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new filter: \"%\" with % channels\n").postf(name, signalNumChannels) };
 		}, update);
@@ -309,8 +309,8 @@ Steno {
 		this.addSynthDef(name, {
 			var stenoSignal, signalNumChannels;
 			signalNumChannels = min(numChannels ? this.numChannels, this.numChannels);
-			stenoSignal = StenoSignal(signalNumChannels);
-			stenoSignal.quelle(func, multiChannelExpand ? expand, signalNumChannels);
+			stenoSignal = StenoSignal(signalNumChannels, multiChannelExpand ? expand);
+			stenoSignal.quelle(func);
 			stenoSignal.writeToBus;
 			if(verbosity > 0) { ("new quelle: \"%\" with % channels\n").postf(name, signalNumChannels) };
 		}, update);
@@ -332,6 +332,7 @@ Steno {
 	operator { |name, func, arity = 2, multiChannelExpand, update = true|
 
 		var updateSubgraph = this.prevTokens.includes(name) and: { operators[name] != arity };
+		if(multiChannelExpand.notNil) { "Steno operator multiChannelExpand not yet supported. Ignoring it.".warn };
 
 		this.addSynthDef(name, {
 			var numChannels = this.numChannels;
