@@ -9,7 +9,7 @@ todo:
 
 AbstractStenoSynthFunction {
 
-	var <func, <numChannels;
+	var <func, <>numChannels;
 	var <>multiChannelExpand;
 	var <stenoSignal;
 
