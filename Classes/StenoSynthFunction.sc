@@ -61,14 +61,14 @@ StenoOperatorFunction : AbstractStenoSynthFunction {
 	var <>arity, <totalNumChannels;
 
 	value {
-
+		var inputs, outputs;
 		totalNumChannels = numChannels * arity;
 		stenoSignal = StenoSignal(totalNumChannels);
-		var inputs = { |i|
+		inputs = { |i|
 			stenoSignal.filterInput(numChannels, i * numChannels);
 		} ! arity;
 
-		var outputs = func.value(*inputs.keep(arity).add(stenoSignal.controls));
+		outputs = func.value(*inputs.keep(arity).add(stenoSignal.controls));
 		if(outputs.notNil) {
 			outputs = outputs.asArray.keep(numChannels);
 			stenoSignal.filterOutput(outputs, numChannels);
