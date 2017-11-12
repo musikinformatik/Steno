@@ -464,10 +464,8 @@ Steno {
 		dummyOpeningFunction = {
 			var stenoSignal;
 			stenoSignal = StenoSignal(numChannels);
-			stenoSignal.quelle(nil, true, numChannels);
 			FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
 
-			stenoSignal.writeToBus;
 		};
 
 		// begin serial: dry = in
