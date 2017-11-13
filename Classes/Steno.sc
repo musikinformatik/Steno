@@ -463,6 +463,7 @@ Steno {
 		// 	ReplaceOut.ar(stenoSignal.outBus, Silent.ar(numChannels)); // umbrella
 		// 	FreeSelfWhenDone.kr(stenoSignal.env);
 		// };
+		/*
 		dummyOpeningFunction = {
 			var stenoSignal;
 			stenoSignal = StenoSignal(numChannels);
@@ -471,7 +472,7 @@ Steno {
 
 			stenoSignal.writeToBus;
 		};
-
+		*/
 		// begin serial: dry = in
 		/*
 		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
@@ -490,8 +491,8 @@ Steno {
 
 		this.addSynthDef('(', routingFunction, force:true);
 
-		this.addSynthDef('[', dummyOpeningFunction, force:true);
-		this.addSynthDef('{', dummyOpeningFunction, force:true);
+		this.addSynthDef('[', dummyFunction, force:true);
+		this.addSynthDef('{', dummyFunction, force:true);
 
 		this.addSynthDef(')', routingFunction, force:true);
 		this.addSynthDef(']', routingFunction, force:true);
