@@ -461,13 +461,14 @@ Steno {
 		// 	ReplaceOut.ar(stenoSignal.outBus, Silent.ar(numChannels)); // umbrella
 		// 	FreeSelfWhenDone.kr(stenoSignal.env);
 		// };
+		/*
 		dummyOpeningFunction = {
 			var stenoSignal;
 			stenoSignal = StenoSignal(numChannels);
 			FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
 
 		};
-
+		*/
 		// begin serial: dry = in
 		/*
 		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
@@ -486,8 +487,8 @@ Steno {
 
 		this.addSynthDef('(', routingFunction, force:true);
 
-		this.addSynthDef('[', dummyOpeningFunction, force:true);
-		this.addSynthDef('{', dummyOpeningFunction, force:true);
+		this.addSynthDef('[', dummyFunction, force:true);
+		this.addSynthDef('{', dummyFunction, force:true);
 
 		this.addSynthDef(')', routingFunction, force:true);
 		this.addSynthDef(']', routingFunction, force:true);
