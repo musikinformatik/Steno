@@ -38,7 +38,6 @@ VarDiffString {
 		var sString = "".copy, tString = "".copy;
 
 		changes = diffFunc.value(prevTokens, tokens);
-		changes.postln;
 		beginFunc.value;
 		changes.do { | vals |
 			var token, sourceIndex, targetIndex;
@@ -129,13 +128,15 @@ VarDiffString {
 
 	diff1 {
 		diffFunc = {| prevTokens, tokens |
-			var changes, sz, reversedChanges;
-			sz = prevTokens.size - 1;
+			var changes, psz, tsz, reversedChanges;
+			psz = prevTokens.size - 1;
+			tsz = tokens.size - 1;
 			prevTokens = prevTokens.reverse;
 			tokens = tokens.reverse;
 			changes = VarDiffString.parseld(VarDiffString.ld(prevTokens, tokens), prevTokens, tokens);
 			changes = changes.collect { | tst |	//token, source, target
-				tst[1] !? { tst[1] = sz - tst[1]};
+				tst[1] !? { tst[1] = psz - tst[1]};
+				tst[2] !? { tst[2] = tsz - tst[2]};
 				tst;
 			};
 			changes.reverse;
@@ -193,7 +194,7 @@ t.value("aaf"); ""
 t.value("aaff"); ""
 t.value("aafff"); ""
 
-t.diff.diff0;
+t.diff.diff1;
 t.value("aaff"); ""
 
 t.value("faa"); ""
@@ -207,8 +208,8 @@ t.value("faaf"); ""
 t.value("aaf"); ""
 t.synthList
 )
-t.value("baba ffffbbb");
-t.value("aaaafa");
+t.value("ffffbbb baba");
+t.value("!aaaafa");
 t.value("(aaf)(aaf)bb");
 t.value("!(aaf)(aaf)bb");
 t.value("(!aaf)(aaf)bb");

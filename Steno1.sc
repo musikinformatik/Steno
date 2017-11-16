@@ -16,20 +16,29 @@ Steno1 : Steno {
 				};
 			},
 			keepFunc: { |token, i, j|
-				var args, currentSynth, synth;
+				var args, currentSynth, synth, target;
 				if(j != synthList.size) {
 					"keepFunc: some inconsistency happened, nothing to see here, keep going ...".warn;
 				} {
 					args = this.calcNextArguments(token);
 					if(argumentStack.replaceAll) {
-						synth = this.newSynth(token, j, args, currentSynth.nodeID); // place new synth after old
+						synth = this.newSynth(token, j, args, oldSynthList[i].nodeID); // place new synth after old
 						oldSynthList[i].release;
 					} {
 						synth = oldSynthList[i];
 						synth.set(*args);
+						target = synthList[j-1];
+						if(target.isNil) {
+							synth.moveToHead(group);
+						} {
+							synth.moveAfter(target);
+						};
+
+
 					};
 					synthList = synthList.add(synth);
 					argList = argList.add(args);
+
 				};
 			},
 			beginFunc: {
@@ -53,11 +62,13 @@ Steno1 : Steno {
 /*
 (
 t = Steno1.new;
+t.verbosity = -1;
 t.quelle(\a, { Blip.ar(Rand(4, 16)) * 0.2 });
 t.quelle(\b, { Saw.ar(Rand(400, 700)) * 0.2 });
 t.filter(\f, { |input| CombL.ar(input, 0.2, Rand(0.01, 0.02), Rand(0.4, 2) ) });
 
 t.value("aafbaaf"); ""
+t.value("!aafbaaf"); ""
 t.value("faaf"); ""
 t.value("aaf"); ""
 t.diff.diff1;
@@ -69,7 +80,10 @@ t.diff.diff2;
 t.value("faa"); ""
 t.value("aaf"); ""
 t.value("faa"); ""
-t.value("aaf"); ""
+t.value("faaf"); ""
+t.diff.diff3;
+t.value("faaf"); ""
+
 t.synthList
 )
 t.value("baba ffffbbb");
