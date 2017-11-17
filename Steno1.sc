@@ -61,13 +61,22 @@ Steno1 : Steno {
 }
 /*
 (
+s.waitForBoot {
 t = Steno1.new;
 t.verbosity = -1;
-t.quelle(\a, { Blip.ar(Rand(4, 16)) * 0.2 });
-t.quelle(\b, { Saw.ar(Rand(400, 700)) * 0.2 });
-t.filter(\f, { |input| CombL.ar(input, 0.2, Rand(0.01, 0.02), Rand(0.4, 2) ) });
+t.quelle(\a, { SinOsc.ar(Rand(200, 2130)) }); // quelle (aka source) produces sound
+t.filter(\f, { |input| LFPulse.kr(ExpRand(1, 10), 0, Rand(0.1, 0.5)) * input }); // filter processes sound
+t.filter(\g, { |input| CombL.ar(input, 0.2, Rand(0.03, 0.2), 1.3) });
+}
+)
 
-t.value("aafbaaf"); ""
+t.value("diff0/aafbaafb"); ""
+t.value("aafb"); ""
+t.value("aafbaafb"); ""
+t.value("aafb"); ""
+t.value("diff1/aafbaafb"); ""
+t.value("diff0/aafb"); ""
+
 t.value("!aafbaaf"); ""
 t.value("faaf"); ""
 t.value("aaf"); ""
@@ -84,18 +93,48 @@ t.value("faaf"); ""
 t.diff.diff3;
 t.value("faaf"); ""
 
-t.synthList
-)
-t.value("baba ffffbbb");
-t.value("aaaafa");
-t.value("(aaf)(aaf)bb");
-t.value("!(aaf)(aaf)bb");
-t.value("(!aaf)(aaf)bb");
+// diff0 and diff1 replace synths whose position shifts
+// relative to retained synths
+t.diff.diff0;
+t.value("faa"); ""
+t.value("aaf"); ""
+t.value("faa"); ""
+t.value("aaf"); ""
 
-t.value("")
+// diff2 and diff3 retain synths whenever possible
 
-s.makeWindow
-s.scope
-s.queryAllNodes
+t.diff.diff2;
+t.value("faa"); ""
+t.value("aaf"); ""
+t.value("faa"); ""
+t.value("aaf"); ""
 
+// diff0 retains towards the end
+t.diff.diff0;
+t.value("faafff"); ""
+t.value("fafaff"); ""
+t.value("faafff"); ""
+t.value("fafaff"); ""
+
+// diff1 retains towards the front
+t.diff.diff1;
+t.value("faafff"); ""
+t.value("fafaff"); ""
+t.value("faafff"); ""
+t.value("fafaff"); ""
+
+// diff2 retains towards the end
+t.diff.diff2;
+t.value("faafff"); ""
+t.value("fafaff"); ""
+t.value("faafff"); ""
+t.value("fafaff"); ""
+
+// diff3 retains towards the front
+t.diff.diff3;
+t.value("fafffa"); ""
+t.value("faffaf"); ""
+t.value("fafaff"); ""
+t.value("faafff"); ""
+t.value("aaffff"); ""
 */
