@@ -4,8 +4,8 @@ Steno {
 	var <numChannels, <expand, <maxBracketDepth, <server, <bus;
 	var <>quant, <settings;
 	var <encyclopedia, <operators;
-	var <monitor, <diff;
-	var <busIndices, <synthList, <argList, <variables;
+	var <monitor, <>diff;
+	var <busIndices, <>synthList, <>argList, <variables;
 	var <tailBus;
 	var <>preProcessor, <>preProcess = true, <cmdLine, <rawCmdLine;
 	var <>verbosity = 1; // 0, 1, 2.
@@ -196,8 +196,6 @@ Steno {
 		protect {
 			if(verbosity > 0) { string.postcs };
 			diff.value(string)
-			//diff.parse(string.as(Array), synthList.collect { |x| this.removePrefix(x.defName) }) // inefficient, but safe
-			// if we use this one, we should use events instead of synths. then alsoprevTokens needs to be changed.
 		} {
 			server.closeBundle(server.latency);
 		}
@@ -268,7 +266,7 @@ Steno {
 			var in, out, dryIn, token, arity;
 			token = this.removePrefix(synthList.at(i).defName);
 			header.postf(token);
-			args = args.keep(-8); // keep the last 4 pairs which are the ones that were added by SynthStack
+			args = args.keep(-10); // keep the last 5 pairs which are the ones that were added by SynthStack
 
 			if(args.isEmpty.not) {
 				in = findBus.(args[1]);
@@ -463,15 +461,14 @@ Steno {
 		// 	ReplaceOut.ar(stenoSignal.outBus, Silent.ar(numChannels)); // umbrella
 		// 	FreeSelfWhenDone.kr(stenoSignal.env);
 		// };
+		/*
 		dummyOpeningFunction = {
 			var stenoSignal;
 			stenoSignal = StenoSignal(numChannels);
-			stenoSignal.quelle(nil, true, numChannels);
 			FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
 
-			stenoSignal.writeToBus;
 		};
-
+		*/
 		// begin serial: dry = in
 		/*
 		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
@@ -490,8 +487,8 @@ Steno {
 
 		this.addSynthDef('(', routingFunction, force:true);
 
-		this.addSynthDef('[', dummyOpeningFunction, force:true);
-		this.addSynthDef('{', dummyOpeningFunction, force:true);
+		this.addSynthDef('[', dummyFunction, force:true);
+		this.addSynthDef('{', dummyFunction, force:true);
 
 		this.addSynthDef(')', routingFunction, force:true);
 		this.addSynthDef(']', routingFunction, force:true);

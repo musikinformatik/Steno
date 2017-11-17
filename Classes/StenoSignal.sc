@@ -13,7 +13,7 @@ StenoSignal {
 
 	init {
 		inBus = \in.kr(0);
-		dryIn = \dryIn.kr(0);
+		dryIn = \dryIn.kr(0); // only used for closing brackets
 		input = In.ar(inBus, numChannels).asArray;
 		tailBus = \tailBus.ir(0);
 
@@ -52,17 +52,7 @@ StenoSignal {
 
 	// get filter input
 	filterInput { |argNumChannels, offset = 0|
-		var sig;
-
-		sig = In.ar(inBus, numChannels).asArray.drop(offset);
-
-		if(argNumChannels.notNil) {
-			sig = sig.keep(argNumChannels);
-			if(multiChannelExpand) { sig = sig.wrapExtend(argNumChannels) };
-		};
-
-
-		^(sig * env)
+		^this.quelleInput(argNumChannels, offset) * env
 	}
 
 	// get quelle input
@@ -78,7 +68,7 @@ StenoSignal {
 
 	// set filter output
 	filterOutput { |signal, argNumChannels, offset = 0|
-		var gateHappened, dcBlocked, oldSignal, drySignal, tailSignal;
+		var gateHappened, dcBlocked, oldSignal, tailSignal;
 		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
@@ -99,7 +89,6 @@ StenoSignal {
 
 
 		oldSignal = In.ar(outBus + offset, argNumChannels); // previous signal on bus
-		drySignal = In.ar(dryIn  + offset, argNumChannels); // dry signal (mostly same as oldSignal but may come from another bus)
 		tailSignal = In.ar(tailBus + offset, argNumChannels); // tails from replaced synths
 
 		// TODO: if replace, set mix to 1
@@ -107,7 +96,7 @@ StenoSignal {
 		signal = Mix.ar([
 			  // mix filter output with dry signal
 			  // signal is supposed to fade out itself (envelope assigned at filter input)
-			XFade2.ar(drySignal, signal, MulAdd(mix, 2, -1)),
+			XFade2.ar(oldSignal, signal, MulAdd(mix, 2, -1)),
 
 			  // collect tails
 			tailSignal,
