@@ -24,7 +24,7 @@ VarDiffString {
 		^super.newCopyArgs(insertFunc, removeFunc, keepFunc, beginFunc, returnFunc, testFunc ? true).init
 	}
 
-	init { prevTokens = []; this.diff0; }
+	init { prevTokens = ""; this.diff0; }
 	diff { | tokens |
 		var changes = diffFunc.value(prevTokens, tokens);
 		prevTokens = tokens;
@@ -35,8 +35,7 @@ VarDiffString {
 		var token, si;
 		var synth, args;
 		var tokenArray =[], target;
-		var sString = "".copy, tString = "".copy;
-
+		var sString = prevTokens.copy, tString = tokens.copy;
 		changes = diffFunc.value(prevTokens, tokens);
 		beginFunc.value;
 		changes.do { | vals |
@@ -44,15 +43,13 @@ VarDiffString {
 			#token, sourceIndex, targetIndex = vals;
 			if(targetIndex.isNil) {
 				removeFunc.(token, sourceIndex, targetIndex);
-				sString = sString.add(token);
 			} {
 				if (sourceIndex.isNil) {
 					insertFunc.(token, sourceIndex, targetIndex);
-					tString = tString.add(token)
 				} {
 					keepFunc.(token, sourceIndex, targetIndex);
-					sString = sString.add(token.toUpper);
-					tString = tString.add(token.toUpper);
+					sString = sString.put(sourceIndex, token.toUpper);
+					tString = tString.put(targetIndex, token.toUpper);
 
 				};
 			};
@@ -159,26 +156,64 @@ VarDiffString {
 
 	diff3 {
 		diffFunc = {| prevTokens, tokens |
-			var d, n, prevPos = ();
+			var sz, d, n, prevPos = ();
 			prevTokens.do{ | c, i |
-				prevPos[c] = (prevPos[c] ? []).addFirst(i)
+				prevPos[c] = prevPos[c].add(i)
 			};
-			tokens.do { | c, i |
-				n = n.add([c, prevPos[c].pop, i])
+			sz = tokens.size - 1;
+			tokens.reverseDo { | c, i |
+				n = n.add([c, prevPos[c].pop, sz - i])
 			};
+			n = n.reverse;
 			prevPos.keysValuesDo{ |k, v | if (v.size >0) { d = d ++ [k,v, nil].flop } };
-			d ++ n;
 		}
 	}
 }
 /*
-VarDiffString.parse(VarDiffString.ld("rabcd", ""), "rabcd", "").do(_.postln)
+s.waitForBoot {
+t = Steno1.new;
 
-	40 ?? {20} ?? { 30}
-	{ 20}, {30})
-*/
+// define a few letters
+t.quelle(\a, { SinOsc.ar(Rand(200, 2130)) }); // quelle (aka source) produces sound
+t.filter(\f, { |input| LFPulse.kr(ExpRand(1, 10), 0, Rand(0.1, 0.5)) * input }); // filter processes sound
+t.filter(\g, { |input| CombL.ar(input, 0.2, Rand(0.03, 0.2), 1.3) });
 
-/*
+t.verbosity = -1;
+
+};
+
+// use them in code:
+t.("af");
+t.("afg");
+t.("aafgafg");
+t.("afg");
+t.("aafgafg");
+
+t.diff.diff1;
+t.("afg");
+t.("aafgafg");
+t.("afg");
+t.("aafgafg");
+
+t.diff.diff2;
+t.("aafgaffg");
+t.("aafgafg");
+t.("aafgaffg");
+
+t.diff.diff3;
+t.("aafgaffg");
+t.("aafgafg");
+t.("aafgaffg");
+
+// selectively redefine the interpretation
+t.quelle(\a, { Blip.ar(ExpRand(1, 130), Rand(3, 100)) });
+t.filter(\g, { |input| RLPF.ar(CombL.ar(distort(input * 3), 0.1, Rand(0.01, 0.2), 0.3), LFDNoise1.kr(0.5).exprange(200, 10000), 0.2) });
+
+// parentheses structure the signal flow
+t.("[(af)(ag)(af)]f");
+t.cmdLine
+t.value; // resend everything
+s.plotTree; // show nodes
 (
 t = Steno1.new;
 t.quelle(\a, { Blip.ar(Rand(4, 16)) * 0.2 });
