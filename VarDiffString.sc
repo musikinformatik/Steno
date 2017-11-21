@@ -31,11 +31,21 @@ VarDiffString {
 		^changes
 	}
 	value { | tokens |
-		var curSynthList, changes, newArgList, display;
+		var curSynthList, changes, newArgList, display, diffSelector, tokenList;
 		var token, si;
 		var synth, args;
 		var tokenArray =[], target;
-		var sString = prevTokens.copy, tString = tokens.copy;
+		var sString, tString;
+
+		if (tokens.includes($/)) {
+			tokenList = tokens.postln.split($/);
+			tokens = tokenList.last;
+			diffSelector = tokenList.first;
+			this.perform(diffSelector.asSymbol);
+		};
+
+		sString = prevTokens.copy;
+		tString = tokens.copy;
 		changes = diffFunc.value(prevTokens, tokens);
 		beginFunc.value;
 		changes.do { | vals |
