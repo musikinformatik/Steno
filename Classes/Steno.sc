@@ -242,7 +242,7 @@ Steno {
 			[\out, bus ? 0, \in, busIndices.first, \amp, 0.1],
 			target: group,
 			addAction:\addAfter
-		).register;
+		).register(true);
 
 	}
 
