@@ -216,10 +216,14 @@ Steno {
 			if(names.isNil or: { names.includes(token) }) {
 				args = argList.at(i);
 				oldSynth = oldSynthList.at(i);
-				newSynth = this.newSynth(token, nil, args, oldSynth.nodeID);
+
+				server.openBundle;
+				newSynth = this.newSynth(token, nil, args, oldSynth);
 				if(verbosity > 1) { ("replaced synth" + token).postln };
 				"releasing old synth with id: %".format(oldSynthList.at(i)).postln;
 				oldSynth.release;
+				server.closeBundle(server.latency);
+
 				synthList.put(i, newSynth);
 			}
 		}
