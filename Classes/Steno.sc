@@ -216,10 +216,12 @@ Steno {
 			if(names.isNil or: { names.includes(token) }) {
 				args = argList.at(i);
 				oldSynth = oldSynthList.at(i);
-				newSynth = this.newSynth(token, nil, args, oldSynth.nodeID);
+
+				newSynth = this.newSynth(token, nil, args, oldSynth);
 				if(verbosity > 1) { ("replaced synth" + token).postln };
 				"releasing old synth with id: %".format(oldSynthList.at(i)).postln;
 				oldSynth.release;
+
 				synthList.put(i, newSynth);
 			}
 		}
@@ -238,7 +240,7 @@ Steno {
 			[\out, bus ? 0, \in, busIndices.first, \amp, 0.1],
 			target: group,
 			addAction:\addAfter
-		).register;
+		).register(true);
 
 	}
 
