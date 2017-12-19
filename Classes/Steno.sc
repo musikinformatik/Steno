@@ -12,6 +12,7 @@ Steno {
 	var <group;
 
 	var <argumentStack;
+	var <>beginFunction;
 
 	classvar <>current;
 
@@ -604,6 +605,7 @@ Steno {
 				this.startGroup;
 				// add a limiter to the end of the signal chain
 				this.startMonitor;
+				this.beginFunction.value;
 			},
 			returnFunc: {
 				if(verbosity > 1) { this.dumpStructure };
