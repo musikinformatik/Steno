@@ -68,7 +68,7 @@ StenoSignal {
 
 	// set filter output
 	filterOutput { |signal, argNumChannels, offset = 0|
-		var gateHappened, dcBlocked, oldSignal, tailSignal;
+		var gateHappened, dcBlocked, oldSignal, tailSignal, sumSignal;
 		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
@@ -76,7 +76,9 @@ StenoSignal {
 
 		// gating analysis
 		gateHappened = gate <= 0;
-		dcBlocked = LeakDC.ar(Sanitize.ar(signal.sum));
+		sumSignal = signal.sum;
+		if(\Sanitize.asClass.notNil) { sumSignal = Sanitize.ar(sumSignal) };
+		dcBlocked = LeakDC.ar(sumSignal);
 
 		// free synth if signal constant for fadeTime:
 		DetectSilence.ar(max(gate, dcBlocked), time: fadeTime, doneAction:2);
