@@ -172,14 +172,14 @@ StenoSignal {
 
 	writeToBus {
 		outputSignals !? {
-			outputSignals.keep(numChannels);
+			outputSignals = outputSignals.keep(numChannels);
 			// write to tailBus if going to be replaced, else write silence
 			// TODO: write silence if release (not replace)
-			ReplaceOut.ar(tailBus, outputSignals.keep(numChannels) * (1 - gate));
+			ReplaceOut.ar(tailBus, outputSignals * (1 - gate));
 
-			// write to outBus unless goint to be replaced
+			// write to outBus unless it is going to be replaced
 			// TODO: write to outBus if release (not replace)
-			XOut.ar(outBus, gate, outputSignals.keep(numChannels));
+			XOut.ar(outBus, gate, outputSignals);
 
 		}
 	}
@@ -192,6 +192,7 @@ StenoSignal {
 
 		output = output.asArray;
 		size = output.size;
+
 
 		if(multiChannelExpand and: { size < argNumChannels }) { // make it once more, this time the right size.
 			output = ({ func.value(inputSignal, controls) } ! (argNumChannels div: size).max(1)).flatten(1).keep(argNumChannels);
