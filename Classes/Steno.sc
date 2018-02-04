@@ -13,6 +13,7 @@ Steno {
 
 	var <argumentStack;
 	var <>beginFunction;
+	var ignoreReplaceAll = false;
 
 	classvar <>current;
 
@@ -87,14 +88,14 @@ Steno {
 	set { |name ... keyValuePairs|
 		this.sched {
 			settings.set(name, keyValuePairs);
-			this.eval(cmdLine);
+			this.reeval;
 		}
 	}
 
 	setGlobal { |... keyValuePairs|
 		this.sched {
 			settings.setGlobal(keyValuePairs);
-			this.eval(cmdLine);
+			this.reeval;
 		}
 	}
 
@@ -201,6 +202,12 @@ Steno {
 			server.closeBundle(server.latency);
 		}
 
+	}
+
+	reeval {
+		ignoreReplaceAll = true;
+		this.eval(cmdLine);
+		ignoreReplaceAll = false;
 	}
 
 	prevTokens {
@@ -590,7 +597,7 @@ Steno {
 					argList.put(i, args);
 					currentSynth = synthList.at(i);
 
-					if(argumentStack.replaceAll) {
+					if(ignoreReplaceAll.not and: { argumentStack.replaceAll }) {
 						synth = this.newSynth(token, i, args, currentSynth.nodeID); // place new synth after old
 						currentSynth.release;
 						synthList.put(i, synth);
