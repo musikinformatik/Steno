@@ -1,8 +1,14 @@
+/*
+
+StenoSignal encapsulates the signal routing in steno. It is always created inside a SynthDef
+Its counterpart is StenoStack, which sets the parameters for each synth
+
+*/
 
 StenoSignal {
 	var <numChannels, <multiChannelExpand;
-	var <inBus, <outBus, <env, <gate, <fadeTime, fadeEnv, <attack, <mix, <through, <dryIn, <feedback;
-	var <tailBus; // holds tails of replaced synths
+	var <inBus, <outBus, <tailBus, <mix, <through, <dryIn, <feedback;
+	var <env, <gate, <fadeTime, fadeEnv, <attack;
 	var <synthIndex, <index, <nestingDepth, <input, <controls;
 	var outputSignals;
 
@@ -12,28 +18,44 @@ StenoSignal {
 	}
 
 	init {
-		inBus = \in.kr(0);
-		dryIn = \dryIn.kr(0); // only used for closing brackets
-		input = In.ar(inBus, numChannels).asArray;
-		tailBus = \tailBus.ir(0);
+		this.initIO;
+		this.initEnvelope;
+		this.initControls;
+	}
 
-		outBus = \out.kr(0);
-		outputSignals = Array.fill(numChannels, 0.0);
+	initIO {
+		inBus = \in.kr(0); // the bus from which the "in" argument reads
+		outBus = \out.kr(0); // the bus onto which the output signal is written
+		dryIn = \dryIn.kr(0); // the bus of the previous level of nesting
+		tailBus = \tailBus.ir(0); // the bus for the tailing off signals of released synths
 
-		gate = \gate.kr(1);
-		fadeTime = \fadeTime.kr(0.02);
-		attack = \attack.kr(0.02);
-		env = EnvGen.kr(Env.asr(attack, 1, fadeTime, [-2, 2]), gate);
+		input = In.ar(inBus, numChannels).asArray; // the input passed to the "in" argument
+		outputSignals = Array.fill(numChannels, 0.0); // the output channels that the outputs are added to
 
+		// mix is the amount of signal contributed to the output
 		mix = \mix.kr(1);
-		through = \through.kr(0); // used for brackets, no external parameter
 
-		synthIndex = \synthIndex.kr(0);
-		index = \index.kr(0);
-		nestingDepth = \nestingDepth.kr(0);
+		// through is how much to let through the old signal on the out bus.
+		// it is set to 1 for parallel synths, which read from another bus and all mix a signal on their output
+		through = \through.kr(0);
+	}
 
-		feedback = \feedback.kr(0);
+	initEnvelope {
+		gate = \gate.kr(1); // when gate becomes zero, the synth is released
+		fadeTime = \fadeTime.kr(0.02); // the crossfade time
+		attack = \attack.kr(0.02); // the attack crossfade time
+		env = EnvGen.kr(Env.asr(attack, 1, fadeTime, [-2, 2]), gate); // the crossfading envelope.
+	}
 
+	initControls {
+
+		synthIndex = \synthIndex.kr(0); // the number of synths of the same name that have occurred before
+		index = \index.kr(0); // the total number of synths, excluding special characters like brackets
+		nestingDepth = \nestingDepth.kr(0); // the current depth
+
+		feedback = \feedback.kr(0); // a control used by feedback ugens (variable declarations)
+
+		// the controls are passed as second argument to synth functions so that uges can depend on them
 		// see also StenoStack:updateControls
 		controls = (
 			index: index,
@@ -49,6 +71,7 @@ StenoSignal {
 			feedback: feedback
 		);
 	}
+
 
 	// get filter input
 	filterInput { |argNumChannels, offset = 0|
@@ -66,25 +89,6 @@ StenoSignal {
 		^sig
 	}
 
-	// used in filter
-	freeSelfWhenSilent { |signal|
-		var sumSignal, gateHappened, dcBlocked;
-		// gating analysis
-		gateHappened = gate <= 0;
-		sumSignal = signal.sum;
-		if(\Sanitize.asClass.notNil) { sumSignal = Sanitize.ar(sumSignal) };
-		dcBlocked = LeakDC.ar(sumSignal);
-
-		// free synth if signal constant for fadeTime:
-		DetectSilence.ar(max(gate, dcBlocked), time: fadeTime, doneAction:2);
-
-		// if signal not constant, remove hanging notes some time after release
-		FreeSelf.kr(
-			TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30)))      //  or
-			// + (gateHappened * \steno_unhang.tr(0))
-		);
-	}
-
 	// set filter output
 	filterOutput { |signal, argNumChannels, offset = 0|
 		var oldSignal, tailSignal, drySignal;
@@ -98,8 +102,6 @@ StenoSignal {
 		oldSignal = In.ar(outBus + offset, argNumChannels); // previous signal on bus
 		tailSignal = In.ar(tailBus + offset, argNumChannels); // tails from replaced synths
 
-		// TODO: if replace, set mix to 1
-
 		signal = Mix.ar([
 			// mix filter output with dry signal
 			// signal is supposed to fade out itself (envelope assigned at filter input)
@@ -108,9 +110,7 @@ StenoSignal {
 			// collect tails
 			tailSignal,
 
-			// fade old signal according to 1-env
 			// `through` is used to carry original signal in the parallel case
-
 			oldSignal * (through * env)
 		]);
 
@@ -144,53 +144,6 @@ StenoSignal {
 		FreeSelfWhenDone.kr(env);    // free synth if gate 0
 		this.addOutput(signal, offset);
 	}
-
-	// this happens when we go one nesting level up
-	// for parentheses, brackets and operators
-	closeBracket {
-		var oldSignal, inputOutside, signal;
-
-		// TODO: check if we need outBus + offset for a closing parenthesis inside an operator
-		oldSignal = In.ar(outBus, numChannels); // the old signal on the bus, mixed in by through
-		inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
-
-		signal = XFade2.ar(inputOutside, input, MulAdd(mix, 2, -1));
-
-		// through controls balance between serial bus result and outside bus
-		signal = Mix.ar([
-			signal,
-			oldSignal * max(through, 1 - env)
-		]);
-
-		// fade old input according to gate, signal is supposed to fade out itself.
-		FreeSelfWhenDone.kr(env); // free synth if gate 0
-
-		// the last one cleans up - overwrite channel with zero:
-		ReplaceOut.ar(inBus, Silent.ar(numChannels));
-
-		this.addOutput(signal);
-
-	}
-
-	// this happens when we enter a serial structure (opening round parenthesis)
-	beginSerial {
-		var oldSignal, inputOutside, signal;
-
-		// TODO: check if we need outBus + offset for an opening parenthesis inside an operator
-		oldSignal = In.ar(outBus, numChannels);  // previous signal on bus
-		inputOutside = In.ar(dryIn, numChannels); // dryIn: bus outside parenthesis
-
-		oldSignal = oldSignal * through; // when through is zero (serial in serial mode), play nothing from the same bus.
-		signal = XFade2.ar(oldSignal, inputOutside, MulAdd(mix, 2, -1));
-
-		FreeSelfWhenDone.kr(env); // free synth if gate 0
-
-		// for now, we just write output to outBus, not to tailBus.
-		// TODO: check if this is ok.
-
-		XOut.ar(outBus, env, signal);
-	}
-
 
 	// unique filter definition
 	filter { |func, multiChannelExpand, argNumChannels|
@@ -229,13 +182,13 @@ StenoSignal {
 			outputSignals = outputSignals.keep(numChannels);
 
 			// write to tailBus if going to be replaced, else write silence
-			// TODO:
+			// TODO (?):
 			// if release: write silence -> tailBus
 			// if replaced: write output signals -> tailBus
 			ReplaceOut.ar(tailBus, outputSignals * (1 - gate));
 
 			// write to outBus unless it is going to be replaced
-			// TODO:
+			// TODO (?):
 			// if release: write outputSignals -> outBus
 			// if replaced: write silence -> outBus ?
 
@@ -269,6 +222,74 @@ StenoSignal {
 		^output
 	}
 
+
+	// internal special functions
+
+	// used in filter
+	freeSelfWhenSilent { |signal|
+		var sumSignal, gateHappened, dcBlocked;
+		// gating analysis
+		gateHappened = gate <= 0;
+		sumSignal = signal.sum;
+		if(\Sanitize.asClass.notNil) { sumSignal = Sanitize.ar(sumSignal) };
+		dcBlocked = LeakDC.ar(sumSignal);
+
+		// free synth if signal constant for fadeTime:
+		DetectSilence.ar(max(gate, dcBlocked), time: fadeTime, doneAction:2);
+
+		// if signal not constant, remove hanging notes some time after release
+		FreeSelf.kr(
+			TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30)))      //  or
+			// + (gateHappened * \steno_unhang.tr(0))
+		);
+	}
+
+	// this happens when we go one nesting level up
+	// for parentheses, brackets and operators
+	closeBracket {
+		var oldSignal, inputOutside, signal;
+
+		// TODO: check if we need outBus + offset for a closing parenthesis inside an operator
+		oldSignal = In.ar(outBus, numChannels); // the old signal on the bus, mixed in by through
+		inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
+
+		signal = XFade2.ar(inputOutside, input, MulAdd(mix, 2, -1)) * env;
+
+		// through controls balance between serial bus result and outside bus
+		signal = Mix.ar([
+			signal * env,
+			oldSignal * (through * env), //max(through, 1 - env)
+			inputOutside * ((1 - env) * (1 - through))
+		]);
+
+		// fade old input according to gate, signal is supposed to fade out itself.
+		FreeSelfWhenDone.kr(env); // free synth if gate 0
+
+		// the last one cleans up - overwrite channel with zero:
+		ReplaceOut.ar(inBus, Silent.ar(numChannels));
+
+		this.addOutput(signal);
+
+	}
+
+	// this happens when we enter a serial structure (opening round parenthesis)
+	beginSerial {
+		var oldSignal, inputOutside, signal;
+
+		// TODO: check if we need outBus + offset for an opening parenthesis inside an operator
+		oldSignal = In.ar(outBus, numChannels);  // previous signal on bus
+		inputOutside = In.ar(dryIn, numChannels); // dryIn: bus outside parenthesis
+
+		oldSignal = oldSignal * through; // when through is zero (serial in serial mode), play nothing from the same bus.
+		signal = XFade2.ar(oldSignal, inputOutside, MulAdd(mix, 2, -1));
+
+		FreeSelfWhenDone.kr(env); // free synth if gate 0
+
+		// for now, we just write output to outBus, not to tailBus.
+		// TODO: check if this is ok.
+
+		XOut.ar(outBus, env, signal);
+	}
 
 
 }
