@@ -101,15 +101,15 @@ StenoSignal {
 		// TODO: if replace, set mix to 1
 
 		signal = Mix.ar([
-			  // mix filter output with dry signal
-			  // signal is supposed to fade out itself (envelope assigned at filter input)
+			// mix filter output with dry signal
+			// signal is supposed to fade out itself (envelope assigned at filter input)
 			XFade2.ar(oldSignal, signal, MulAdd(mix, 2, -1)),
 
-			  // collect tails
+			// collect tails
 			tailSignal,
 
-			  // fade old signal according to 1-env
-			  // `through` is used to carry original signal in the parallel case
+			// fade old signal according to 1-env
+			// `through` is used to carry original signal in the parallel case
 			oldSignal * max(through, 1 - env)
 		]);
 
@@ -129,20 +129,44 @@ StenoSignal {
 
 
 		signal = Mix.ar([
-			  // signal strength (mix) and envelope multiplication
+			// signal strength (mix) and envelope multiplication
 			signal * mix * env,
 
-			  // collect tails
+			// collect tails
 			tailSignal,
 
-			  // only add old signal if last in replaceGroup
-			  // TODO: if release (not replace), continue mixing
+			// only add old signal if last in replaceGroup
+			// TODO: if release (not replace), continue mixing
 			oldSignal * gate
 		]);
 
 		FreeSelfWhenDone.kr(env);                                    // free synth if gate 0
 		this.addOutput(signal, offset);
 	}
+
+	// this happens when we go one nesting level up
+	// for both operators and parallel
+	closeBracket {
+		var oldSignal, inputOutside, signal;
+
+		oldSignal = In.ar(outBus, numChannels); // the old signal on the bus, mixed in by through
+		inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
+
+		signal = XFade2.ar(inputOutside, this.input, MulAdd(mix, 2, -1));
+
+		// through controls balance between serial bus result and outside bus
+		signal = Mix.ar([
+			signal,
+			oldSignal * max(through, 1 - env)
+		]);
+
+		// fade old input according to gate, signal is supposed to fade out itself.
+		FreeSelfWhenDone.kr(env); // free synth if gate 0
+		ReplaceOut.ar(inBus, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
+		this.addOutput(signal);
+	}
+
+
 
 	// unique filter definition
 	filter { |func, multiChannelExpand, argNumChannels|
@@ -220,6 +244,7 @@ StenoSignal {
 		};
 		^output
 	}
+
 
 
 }

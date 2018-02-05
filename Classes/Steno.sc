@@ -425,6 +425,8 @@ Steno {
 		// 		)
 		// 	)
 		// }, force:true);
+
+
 		this.addSynthDef(\monitor, { |out, in, amp = 0.1, level = 0.9|
 			Out.ar(out,
 				Limiter.ar(
@@ -436,29 +438,10 @@ Steno {
 		}, force:true);
 
 		// same for all closing brackets
-		// mix controls balance between serial bus result and outside bus
-		routingFunction = {// |in, out, dryIn, mix = 1, through = 0| // mix = 1: don't add outside in twice
-			var oldSignal, inputOutside, stenoSignal, signal, signalOnMixBus;
-
-			stenoSignal = StenoSignal(numChannels);
+		routingFunction = {
+			var stenoSignal = StenoSignal(numChannels);
 			stenoSignal.filterInput;
-			oldSignal = In.ar(stenoSignal.outBus, numChannels); // the old signal on the bus, mixed in by through
-			inputOutside = In.ar(stenoSignal.dryIn, numChannels);  // dryIn: bus outside parenthesis
-
-			signal = XFade2.ar(inputOutside, stenoSignal.input, MulAdd(stenoSignal.mix, 2, -1));
-
-			signal = Mix.ar([
-				signal,
-				oldSignal * max(
-					stenoSignal.through,
-					1 - stenoSignal.env
-				)
-			]);   // fade old input according to gate, signal is supposed to fade out itself.
-
-			FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
-			ReplaceOut.ar(stenoSignal.inBus, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
-
-			stenoSignal.addOutput(signal);
+			stenoSignal.closeBracket;
 			stenoSignal.writeToBus;
 		};
 
@@ -473,9 +456,9 @@ Steno {
 		// };
 		/*
 		dummyOpeningFunction = {
-			var stenoSignal;
-			stenoSignal = StenoSignal(numChannels);
-			FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
+		var stenoSignal;
+		stenoSignal = StenoSignal(numChannels);
+		FreeSelfWhenDone.kr(stenoSignal.env); // free synth if gate 0
 
 		};
 		*/
