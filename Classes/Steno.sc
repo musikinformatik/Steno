@@ -437,13 +437,6 @@ Steno {
 			)
 		}, force:true);
 
-		// same for all closing brackets
-		routingFunction = {
-			var stenoSignal = StenoSignal(numChannels);
-			stenoSignal.filterInput;
-			stenoSignal.closeBracket;
-			stenoSignal.writeToBus;
-		};
 
 		// nothing to do, just clean up bus, to be sure.
 		// dummyOpeningFunction = {
@@ -462,10 +455,15 @@ Steno {
 
 		};
 		*/
-		// begin serial: dry = in
-		/*
 
-		*/
+
+		// same for all closing brackets
+		routingFunction = {
+			var stenoSignal = StenoSignal(numChannels);
+			stenoSignal.filterInput;
+			stenoSignal.closeBracket;
+			stenoSignal.writeToBus;
+		};
 
 		dummyFunction = {
 			FreeSelf.kr(\gate.kr(1) < 1)
