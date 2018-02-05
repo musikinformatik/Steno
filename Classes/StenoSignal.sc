@@ -66,14 +66,9 @@ StenoSignal {
 		^sig
 	}
 
-	// set filter output
-	filterOutput { |signal, argNumChannels, offset = 0|
-		var gateHappened, dcBlocked, oldSignal, tailSignal, sumSignal;
-		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
-
-		signal = signal.asArray.keep(argNumChannels);
-		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
-
+	// used in filter
+	freeSelfWhenSilent { |signal|
+		var sumSignal, gateHappened, dcBlocked;
 		// gating analysis
 		gateHappened = gate <= 0;
 		sumSignal = signal.sum;
@@ -88,7 +83,17 @@ StenoSignal {
 			TDelay.kr(gateHappened, max(fadeTime, \hangTime.kr(30)))      //  or
 			// + (gateHappened * \steno_unhang.tr(0))
 		);
+	}
 
+	// set filter output
+	filterOutput { |signal, argNumChannels, offset = 0|
+		var oldSignal, tailSignal;
+		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
+
+		signal = signal.asArray.keep(argNumChannels);
+		if(multiChannelExpand) { signal = signal.wrapExtend(argNumChannels) };
+
+		this.freeSelfWhenSilent(signal);
 
 		oldSignal = In.ar(outBus + offset, argNumChannels); // previous signal on bus
 		tailSignal = In.ar(tailBus + offset, argNumChannels); // tails from replaced synths
