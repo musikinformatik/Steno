@@ -175,15 +175,22 @@ StenoSignal {
 		}
 	}
 
+	// we try to keep this uniform for all kinds of signals.
 	writeToBus {
 		outputSignals !? {
 			outputSignals = outputSignals.keep(numChannels);
+
 			// write to tailBus if going to be replaced, else write silence
-			// TODO: write silence if release (not replace)
+			// TODO:
+			// if release: write silence -> tailBus
+			// if replaced: write output signals -> tailBus
 			ReplaceOut.ar(tailBus, outputSignals * (1 - gate));
 
 			// write to outBus unless it is going to be replaced
-			// TODO: write to outBus if release (not replace)
+			// TODO:
+			// if release: write outputSignals -> outBus
+			// if replaced: write silence -> outBus ?
+
 			XOut.ar(outBus, gate, outputSignals);
 
 		}
@@ -207,6 +214,7 @@ StenoSignal {
 		if(output.size > argNumChannels) {
 			// definitely limit number of channels.
 			// here we could also just keep n channels instead?
+			// this would happen in writeToBus automatically
 			output = SplayAz.ar(argNumChannels, output);
 			"Mapped synth def function channels from % to % channels\n".postf(size, argNumChannels);
 		};
