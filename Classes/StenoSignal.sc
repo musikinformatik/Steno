@@ -180,7 +180,7 @@ StenoSignal {
 		inputOutside = In.ar(dryIn, numChannels); // dryIn: bus outside parenthesis
 
 		oldSignal = oldSignal * through; // when through is zero (serial in serial mode), play nothing from the same bus.
-		signal = XFade2.ar(inputOutside, oldSignal, MulAdd(mix, 2, -1));
+		signal = XFade2.ar(oldSignal, inputOutside, MulAdd(mix, 2, -1));
 
 		FreeSelfWhenDone.kr(env); // free synth if gate 0
 
