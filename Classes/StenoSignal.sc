@@ -149,6 +149,7 @@ StenoSignal {
 	closeBracket {
 		var oldSignal, inputOutside, signal;
 
+		// TODO: check if we need outBus + offset for a closing parenthesis inside an operator
 		oldSignal = In.ar(outBus, numChannels); // the old signal on the bus, mixed in by through
 		inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
 
@@ -170,10 +171,22 @@ StenoSignal {
 
 	}
 
+	// this happens when we enter a serial structure (opening round parenthesis)
 	beginSerial {
-		var input = In.ar(dryIn, numChannels); // dryIn: bus outside parenthesis
-		var oldSignal = In.ar(out + offset, numChannels);  // previous signal on bus
-		var signal = XFade2.ar(input, through * oldSignal, mix * 2 - 1);
+		var oldSignal, inputOutside, signal;
+
+		// TODO: check if we need outBus + offset for an opening parenthesis inside an operator
+		oldSignal = In.ar(outBus, numChannels);  // previous signal on bus
+		inputOutside = In.ar(dryIn, numChannels); // dryIn: bus outside parenthesis
+
+		oldSignal = oldSignal * through; // when through is zero (serial in serial mode), play nothing from the same bus.
+		signal = XFade2.ar(inputOutside, oldSignal, MulAdd(mix, 2, -1));
+
+		FreeSelfWhenDone.kr(env); // free synth if gate 0
+
+		// for now, we just write output to outBus, not to tailBus.
+		// TODO: check if this is ok.
+
 		XOut.ar(outBus, env, signal);
 	}
 
