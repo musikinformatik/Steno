@@ -110,7 +110,8 @@ StenoSignal {
 
 			// fade old signal according to 1-env
 			// `through` is used to carry original signal in the parallel case
-			oldSignal * max(through, 1 - env)
+			// TODO: check if this is really not needed. see issue #43.
+			// oldSignal * max(through, 1 - env)
 		]);
 
 		this.addOutput(signal, offset);
