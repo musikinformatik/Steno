@@ -412,7 +412,7 @@ Steno {
 	// building synth defs
 
 	initSynthDefs {
-		var routingFunction, dummyFunction, dummyOpeningFunction;
+		var routingFunction, beginSerialFunction, dummyFunction, dummyOpeningFunction;
 		// we always go through a limiter here.
 
 		// LFSaw.de -- quite heavy processing and sound shaping, I'll rather reduce the signal (since there's likely lots of summation happening) and have the intended level up.
@@ -464,21 +464,26 @@ Steno {
 		*/
 		// begin serial: dry = in
 		/*
-		this.addSynthDef('(', { |in, out, dryIn, mix = 0, through = 0|
-		var input = In.ar(in, numChannels); // dryIn: bus outside parenthesis
-		var oldSignal = In.ar(out, numChannels);
-		var output = XFade2.ar(input, through * oldSignal, mix * 2 - 1);
-		ReplaceOut.ar(in, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
-		XOut.ar(out, EnvGate.new, output);
-		}, force:true);
+
 		*/
 
 		dummyFunction = {
 			FreeSelf.kr(\gate.kr(1) < 1)
 		};
 
+		beginSerialFunction = {
+			var stenoSignal = StenoSignal(numChannels);
+			stenoSignal.beginSerial;
+			// for now, the beginSerial method writes to bus.
+			// later make a class method like StenoSignal.beginSerial, and StenoSignal.closeBracket
+		};
 
-		this.addSynthDef('(', routingFunction, force:true);
+		//this.addSynthDef('(', routingFunction, force:true);
+
+
+		this.addSynthDef('(', beginSerialFunction, force:true);
+
+
 
 		this.addSynthDef('[', dummyFunction, force:true);
 		this.addSynthDef('{', dummyFunction, force:true);

@@ -140,7 +140,7 @@ StenoSignal {
 			oldSignal * gate
 		]);
 
-		FreeSelfWhenDone.kr(env);                                    // free synth if gate 0
+		FreeSelfWhenDone.kr(env);    // free synth if gate 0
 		this.addOutput(signal, offset);
 	}
 
@@ -152,7 +152,7 @@ StenoSignal {
 		oldSignal = In.ar(outBus, numChannels); // the old signal on the bus, mixed in by through
 		inputOutside = In.ar(dryIn, numChannels);  // dryIn: bus outside parenthesis
 
-		signal = XFade2.ar(inputOutside, this.input, MulAdd(mix, 2, -1));
+		signal = XFade2.ar(inputOutside, input, MulAdd(mix, 2, -1));
 
 		// through controls balance between serial bus result and outside bus
 		signal = Mix.ar([
@@ -162,10 +162,20 @@ StenoSignal {
 
 		// fade old input according to gate, signal is supposed to fade out itself.
 		FreeSelfWhenDone.kr(env); // free synth if gate 0
-		ReplaceOut.ar(inBus, Silent.ar(numChannels)); // clean up: overwrite channel with zero.
+
+		// the last one cleans up - overwrite channel with zero:
+		ReplaceOut.ar(inBus, Silent.ar(numChannels));
+
 		this.addOutput(signal);
+
 	}
 
+	beginSerial {
+		var input = In.ar(dryIn, numChannels); // dryIn: bus outside parenthesis
+		var oldSignal = In.ar(out + offset, numChannels);  // previous signal on bus
+		var signal = XFade2.ar(input, through * oldSignal, mix * 2 - 1);
+		XOut.ar(outBus, env, signal);
+	}
 
 
 	// unique filter definition
