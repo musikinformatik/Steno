@@ -87,7 +87,7 @@ StenoSignal {
 
 	// set filter output
 	filterOutput { |signal, argNumChannels, offset = 0|
-		var oldSignal, tailSignal;
+		var oldSignal, tailSignal, drySignal;
 		argNumChannels = min(argNumChannels  ? numChannels, numChannels - offset); // avoid overrun of total channels given
 
 		signal = signal.asArray.keep(argNumChannels);
@@ -110,8 +110,8 @@ StenoSignal {
 
 			// fade old signal according to 1-env
 			// `through` is used to carry original signal in the parallel case
-			// TODO: check if this is really not needed. see issue #43.
-			// oldSignal * max(through, 1 - env)
+
+			oldSignal * (through * env)
 		]);
 
 		this.addOutput(signal, offset);
