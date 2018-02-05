@@ -145,7 +145,7 @@ StenoSignal {
 	}
 
 	// this happens when we go one nesting level up
-	// for both operators and parallel
+	// for parentheses, brackets and operators
 	closeBracket {
 		var oldSignal, inputOutside, signal;
 
