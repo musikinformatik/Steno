@@ -382,22 +382,42 @@ Steno {
 				"new variable as ".post;
 
 				this.filter(name, { |input, controls|
-					// Bus declaration inside synth func restores busses with
-					// correct channel numbers, e.g. when number of channels changed on the fly
-					var bus = Bus.audio(server, numChannels);
-					var in = LinXFade2.ar(
+					var bus, stored;
+
+
+					// Bus to store the signal
+					//    bus declaration inside synth func restores busses with
+					//    correct channel numbers, e.g. when number of channels
+					//    changed on the fly
+					bus = Bus.audio(server, numChannels);
+
+					// safe bus for introspection
+					variables[name] = bus;
+
+					stored = LinXFade2.ar(
+						// stored signal
+						//     (no feedback: != 0 only after first appearance of variable)
 						inA: In.ar(bus, numChannels),
+
+						// stored signal from previous cycle (limited)
 						inB: Limiter.ar(InFeedback.ar(bus, numChannels), 8, 0.01),
 						// only do InFeedback for first appearance of variable
 						pan: (controls.feedback.abs * (controls.index < 1) * 2 - 1)
-					) * controls.feedback.sign;
+					)
+					// multiply by feedback sign (0.sign == 0 >> 1)
+					* Select.kr(controls.feedback.abs > 0, [1, controls.feedback.sign]);
 
 					// \assignment can be increased for feeding in more than one signal
 					Out.ar(bus, input * (controls.index < \assignment.kr(1)));
 
-					in * controls[\env] + input
+					Mix([
+						// synth always feeds through input signal,
+						// regardless of mix parameter (set externally)
+						input,
+						// the stored signal
+						stored * controls[\env]
+					])
 				});
-				variables[name] = bus;
 			} {
 				"Variable '%' already declared".format(name).warn;
 			}
