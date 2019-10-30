@@ -17,11 +17,16 @@ VarDiffString {
 	var <>insertFunc, <>removeFunc, <>keepFunc;
 	var <>beginFunc, <>returnFunc, <>testFunc;
 
-	var <>prevTokens;
+	var prevTokens;
 	var <>diffFunc;
 
 	*new { |insertFunc, removeFunc, keepFunc, beginFunc, returnFunc, testFunc|
 		^super.newCopyArgs(insertFunc, removeFunc, keepFunc, beginFunc, returnFunc, testFunc ? true).init
+	}
+
+	// Steno requires this to be a list of chars
+	prevTokens {
+		^prevTokens.as(Array)
 	}
 
 	init { prevTokens = ""; this.diff0; }
