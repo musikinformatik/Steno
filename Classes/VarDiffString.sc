@@ -28,6 +28,9 @@ VarDiffString {
 	prevTokens {
 		^prevTokens.as(Array)
 	}
+	prevTokens_ {|charArr|
+		prevTokens = charArr.as(String)
+	}
 
 	init { prevTokens = ""; this.diff0; }
 	diff { | tokens |
