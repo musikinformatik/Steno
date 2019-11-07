@@ -6,7 +6,7 @@ related::Tutorials/Steno Tutorial
 
 DESCRIPTION::
 
-Steno, a little concatenative live coding language embedded in SuperCollider, makes code for combining synth graphs very short, so that writing endless chains is like writing a single long word. A word is a program. A letter is a synth.footnote::This little language was developed together with the students of the music informatics seminar 2013 at the link::http://musikundmedien.net/##IMM::, in particular Armin Badde, Raffael Seyfried and Florian Zeeh. Special thanks also to Hans W. Koch, who moderated the seminar together with me.::
+Steno, a little concatenative live coding language embedded in SuperCollider, makes code for combining synth graphs very short, so that writing endless chains is like writing a single long word. A word is a program. A letter is a synth.footnote::This little language was developed together with the students of the music informatics seminar 2013 at the link::http://musikundmedien.net/##IMM::, in particular Armin Badde, Raffael Seyfried, and Florian Zeeh. It has been further developed together with Till Bovermann and Ron Kuivila. Special thanks also to Hans W. Koch, who moderated the seminar together with me.::
 
 
 Programs look like this:
